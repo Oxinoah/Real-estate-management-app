@@ -12,7 +12,8 @@ import {
 import { supabase } from '../lib/supabase';
 
 /**
- * Login component (see Component Diagram: "Login").
+ * Login component (see Component Diagram: "Login"), laid out like the
+ * Week 1 wireframe.
  * Input: email + password.
  * Database: supabase.auth.signInWithPassword, then a lookup in `profiles`
  *   to resolve the role (buyer / seller / agent) the app needs to route on.
@@ -68,36 +69,50 @@ export default function LoginScreen({ onLoggedIn }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.container}>
-        <Text style={styles.title}>Real Estate App</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
+        <View style={styles.header}>
+          <View style={styles.logo}>
+            <Text style={styles.logoText}>RE</Text>
+          </View>
+          <Text style={styles.title}>Real Estate App</Text>
+          <Text style={styles.subtitle}>Sign in to continue</Text>
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          secureTextEntry
-          autoComplete="password"
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.form}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email address"
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#999"
+            secureTextEntry
+            autoComplete="password"
+            value={password}
+            onChangeText={setPassword}
+          />
+          <Text style={styles.forgot}>Forgot password?</Text>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable style={styles.button} onPress={handleLogin} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Log in</Text>
-          )}
-        </Pressable>
+          <Pressable style={styles.button} onPress={handleLogin} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Log in</Text>
+            )}
+          </Pressable>
+        </View>
+
+        <Text style={styles.footer}>
+          Don't have an account? <Text style={styles.footerLink}>Sign up</Text>
+        </Text>
       </View>
     </KeyboardAvoidingView>
   );
@@ -105,24 +120,52 @@ export default function LoginScreen({ onLoggedIn }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#fff' },
-  title: { fontSize: 24, fontWeight: '700', textAlign: 'center' },
-  subtitle: { fontSize: 14, color: '#888', textAlign: 'center', marginBottom: 32 },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingHorizontal: 24,
+    paddingTop: 80,
+    paddingBottom: 28,
+  },
+  header: { alignItems: 'center', gap: 10, marginBottom: 36 },
+  logo: {
+    width: 64,
+    height: 64,
+    borderRadius: 6,
+    backgroundColor: '#1a1a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoText: { color: '#fff', fontSize: 20, fontWeight: '700', letterSpacing: 1 },
+  title: { fontSize: 20, fontWeight: '700', color: '#1a1a1a' },
+  subtitle: { fontSize: 13, color: '#888' },
+  form: { gap: 14 },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 15,
-    marginBottom: 14,
+    borderColor: '#999',
+    borderRadius: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    color: '#1a1a1a',
   },
-  error: { color: '#c0392b', fontSize: 13, marginBottom: 10, textAlign: 'center' },
+  forgot: { fontSize: 12, color: '#888', alignSelf: 'flex-end' },
+  error: { color: '#c0392b', fontSize: 13, textAlign: 'center' },
   button: {
     backgroundColor: '#1a1a1a',
-    borderRadius: 8,
-    padding: 15,
+    borderWidth: 1,
+    borderColor: '#1a1a1a',
+    borderRadius: 6,
+    paddingVertical: 13,
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 4,
   },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  buttonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  footer: {
+    marginTop: 'auto',
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#888',
+  },
+  footerLink: { color: '#1a1a1a', fontWeight: '600' },
 });
