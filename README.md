@@ -6,7 +6,7 @@ React Native (Expo) mobile app with Supabase (Postgres + Auth) as the backend.
 
 1. `npm install`
 2. Copy `.env.example` to `.env` and fill in your Supabase project's URL and anon key (Supabase dashboard → Project Settings → API).
-3. In the Supabase SQL editor, run `supabase/schema.sql` to create the `profiles` table (stores each user's role: buyer / seller / agent) and the trigger that auto-fills it on signup.
+3. In the Supabase SQL editor, run `supabase/schema.sql` to create the `profiles` table (stores each user's role: buyer / seller / agent) and the trigger that auto-fills it on signup, then run `supabase/schema_02_core_tables.sql` to create the rest of the tables.
 4. `npm start` (Expo), then scan the QR code with Expo Go, or press `i` / `a` for a simulator.
 
 ## Creating test accounts
@@ -28,7 +28,9 @@ src/screens/LoginScreen.js    Week 2 deliverable — email/password via Supabase
 src/screens/BuyerHomeScreen.js    placeholder, Week 3
 src/screens/SellerHomeScreen.js   placeholder, Week 3
 src/screens/AgentHomeScreen.js    placeholder, Week 3
-supabase/schema.sql           profiles table + auto-create trigger
+supabase/schema.sql           profiles table + auto-create trigger (run first)
+supabase/schema_02_core_tables.sql   properties, offers, rental applications, enquiries,
+                              favourites, viewings, status history + security rules (run second)
 ```
 
 ## Team
