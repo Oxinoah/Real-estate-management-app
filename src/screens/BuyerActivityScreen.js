@@ -5,37 +5,79 @@ import TabBar, { BUYER_TABS } from '../components/TabBar';
 import { colors } from '../theme';
 import { supabase } from '../lib/supabase';
 
+const STATUS = {
+  pending: 'Pending',
+  accepted: 'Accepted',
+  rejected: 'Rejected',
+  requested: 'Requested',
+  confirmed: 'Confirmed',
+  declined: 'Declined',
+};
+
+const date = (value) => new Date(value).toLocaleDateString('en-GB');
+const dateTime = (value) =>
+  new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+
+// What each section reads from Supabase and how a row is displayed.
 const SECTIONS = [
-  { title: 'Rental applications', empty: 'You have not applied for any rental yet.' },
-  { title: 'Viewing requests', empty: 'You have not requested any viewing yet.' },
+  {
+    key: 'offers',
+    title: 'Offers',
+    empty: 'You have not made any offers yet.',
+    select: 'offer_id, amount, status, created_at, properties(title, location)',
+    idField: 'offer_id',
+    right: (r) => `€${Math.round(r.amount).toLocaleString('en-GB')}`,
+    line: (r) => `${r.properties?.location} · ${date(r.created_at)}`,
+  },
+  {
+    key: 'rental_applications',
+    title: 'Rental applications',
+    empty: 'You have not applied for any rental yet.',
+    select: 'application_id, move_in_date, notes, status, created_at, properties(title, location)',
+    idField: 'application_id',
+    right: () => null,
+    line: (r) => `Move-in ${date(r.move_in_date)} · sent ${date(r.created_at)}`,
+  },
+  {
+    key: 'enquiries',
+    title: 'Enquiries',
+    empty: 'You have not sent any enquiries yet.',
+    select: 'enquiry_id, message, response, created_at, properties(title)',
+    idField: 'enquiry_id',
+    right: () => null,
+    status: (r) => (r.response ? 'Answered' : 'Waiting'),
+    line: (r) => `“${r.message}”`,
+    extra: (r) => (r.response ? `Answer: ${r.response}` : null),
+  },
+  {
+    key: 'viewings',
+    title: 'Viewing requests',
+    empty: 'You have not requested any viewing yet.',
+    select: 'viewing_id, requested_datetime, status, created_at, properties(title, location)',
+    idField: 'viewing_id',
+    right: () => null,
+    line: (r) => dateTime(r.requested_datetime),
+  },
 ];
 
-const OFFER_STATUS = { pending: 'Pending', accepted: 'Accepted', rejected: 'Rejected' };
-
-// Buyer "My Activity" tab (component "Track My Activity"). Offers are read
-// from Supabase; the other sections are empty for now.
+// Buyer "My Activity" tab (component "Track My Activity"): everything the
+// buyer has sent, read from Supabase, with its current status.
 export default function BuyerActivityScreen({ session, onTabChange }) {
-  const [offers, setOffers] = useState(null);
+  const [data, setData] = useState({});
   const [error, setError] = useState(null);
-  const [enquiries, setEnquiries] = useState(null);
 
   useEffect(() => {
-    supabase
-      .from('offers')
-      .select('offer_id, amount, status, created_at, properties(title, location)')
-      .eq('buyer_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data, error: err }) => {
-        if (err) setError(err.message);
-        else setOffers(data);
-      });
-
-    supabase
-      .from('enquiries')
-      .select('enquiry_id, message, response, created_at, properties(title)')
-      .eq('buyer_id', session.user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => setEnquiries(data || []));
+    SECTIONS.forEach((s) => {
+      supabase
+        .from(s.key)
+        .select(s.select)
+        .eq('buyer_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .then(({ data: rows, error: err }) => {
+          if (err) setError(err.message);
+          else setData((current) => ({ ...current, [s.key]: rows }));
+        });
+    });
   }, []);
 
   return (
@@ -46,56 +88,34 @@ export default function BuyerActivityScreen({ session, onTabChange }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Offers</Text>
-          {error ? (
-            <Text style={styles.empty}>Could not load offers: {error}</Text>
-          ) : !offers ? (
-            <Text style={styles.empty}>Loading…</Text>
-          ) : offers.length === 0 ? (
-            <Text style={styles.empty}>You have not made any offers yet.</Text>
-          ) : (
-            offers.map((o) => (
-              <View key={o.offer_id} style={styles.offerRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.offerTitle}>{o.properties?.title}</Text>
-                  <Text style={styles.empty}>
-                    {o.properties?.location} · {new Date(o.created_at).toLocaleDateString('en-GB')}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.offerTitle}>€{Math.round(o.amount).toLocaleString('en-GB')}</Text>
-                  <Text style={styles.empty}>{OFFER_STATUS[o.status] || o.status}</Text>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Enquiries</Text>
-          {!enquiries ? (
-            <Text style={styles.empty}>Loading…</Text>
-          ) : enquiries.length === 0 ? (
-            <Text style={styles.empty}>You have not sent any enquiries yet.</Text>
-          ) : (
-            enquiries.map((e) => (
-              <View key={e.enquiry_id} style={[styles.offerRow, { flexDirection: 'column', gap: 3 }]}>
-                <Text style={styles.offerTitle}>{e.properties?.title}</Text>
-                <Text style={styles.empty}>“{e.message}”</Text>
-                <Text style={styles.empty}>
-                  {e.response ? `Answer: ${e.response}` : 'Waiting for an answer'}
-                </Text>
-              </View>
-            ))
-          )}
-        </View>
-
-        {SECTIONS.map((s) => (
-          <View key={s.title} style={styles.card}>
-            <Text style={styles.cardTitle}>{s.title}</Text>
-            <Text style={styles.empty}>{s.empty}</Text>
-          </View>
-        ))}
+        {error ? <Text style={styles.empty}>Could not load some activity: {error}</Text> : null}
+        {SECTIONS.map((s) => {
+          const rows = data[s.key];
+          return (
+            <View key={s.key} style={styles.card}>
+              <Text style={styles.cardTitle}>{s.title}</Text>
+              {!rows ? (
+                <Text style={styles.empty}>Loading…</Text>
+              ) : rows.length === 0 ? (
+                <Text style={styles.empty}>{s.empty}</Text>
+              ) : (
+                rows.map((r) => (
+                  <View key={r[s.idField]} style={styles.row}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.rowTitle}>{r.properties?.title}</Text>
+                      <Text style={styles.empty}>{s.line(r)}</Text>
+                      {s.extra && s.extra(r) ? <Text style={styles.empty}>{s.extra(r)}</Text> : null}
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                      {s.right(r) ? <Text style={styles.rowTitle}>{s.right(r)}</Text> : null}
+                      <Text style={styles.empty}>{s.status ? s.status(r) : STATUS[r.status] || r.status}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          );
+        })}
       </ScrollView>
 
       <TabBar tabs={BUYER_TABS} active="activity" onChange={onTabChange} />
@@ -116,7 +136,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
-  offerRow: {
+  row: {
     flexDirection: 'row',
     gap: 12,
     paddingTop: 10,
@@ -124,6 +144,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.divider,
   },
-  offerTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
+  rowTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
   empty: { fontSize: 12, color: colors.muted },
 });

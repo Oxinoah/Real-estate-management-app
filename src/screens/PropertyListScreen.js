@@ -30,13 +30,22 @@ export default function PropertyListScreen({
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+
+  const types = Array.from(new Set(properties.map((p) => p.property_type))).sort();
+  const min = Number(minPrice.replace(/[\s,]/g, '')) || 0;
+  const max = Number(maxPrice.replace(/[\s,]/g, '')) || Infinity;
 
   const q = query.trim().toLowerCase();
   const shown = properties.filter((p) => {
     const matchesText =
       !q || p.title.toLowerCase().includes(q) || p.location.toLowerCase().includes(q);
     const matchesType = filter === 'all' || p.transaction_type === filter;
-    return matchesText && matchesType;
+    const matchesProperty = typeFilter === 'all' || p.property_type === typeFilter;
+    const matchesPrice = Number(p.price) >= min && Number(p.price) <= max;
+    return matchesText && matchesType && matchesProperty && matchesPrice;
   });
 
   return (
@@ -72,6 +81,41 @@ export default function PropertyListScreen({
             </Pressable>
           ))}
         </View>
+        {types.length > 1 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.chips}>
+              {['all', ...types].map((t) => (
+                <Pressable
+                  key={t}
+                  style={[styles.chip, typeFilter === t && styles.chipActive]}
+                  onPress={() => setTypeFilter(t)}
+                >
+                  <Text style={[styles.chipText, typeFilter === t && styles.chipTextActive]}>
+                    {t === 'all' ? 'All types' : t}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </ScrollView>
+        ) : null}
+        <View style={styles.chips}>
+          <TextInput
+            style={[styles.search, styles.priceInput]}
+            placeholder="Min price (€)"
+            placeholderTextColor={colors.placeholderText}
+            keyboardType="numeric"
+            value={minPrice}
+            onChangeText={setMinPrice}
+          />
+          <TextInput
+            style={[styles.search, styles.priceInput]}
+            placeholder="Max price (€)"
+            placeholderTextColor={colors.placeholderText}
+            keyboardType="numeric"
+            value={maxPrice}
+            onChangeText={setMaxPrice}
+          />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.list}>
@@ -82,7 +126,7 @@ export default function PropertyListScreen({
             const isFav = favourites.includes(p.property_id);
             return (
               <Pressable key={p.property_id} style={styles.card} onPress={() => onOpen(p)}>
-                <Photo height={120} />
+                <Photo uri={p.property_images?.[0]?.url} height={120} />
                 <View style={styles.cardBody}>
                   <Text style={styles.cardTitle}>{p.title}</Text>
                   <Text style={styles.cardMeta}>
@@ -140,6 +184,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   chips: { flexDirection: 'row', gap: 8 },
+  priceInput: { flex: 1 },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,

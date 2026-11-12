@@ -28,7 +28,7 @@ export default function BuyerHomeScreen({ session, onLogout }) {
 
     supabase
       .from('properties')
-      .select('*')
+      .select('*, property_images(url)')
       .neq('status', 'draft')
       .order('created_at', { ascending: false })
       .then(({ data, error: err }) => {
