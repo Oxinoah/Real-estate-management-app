@@ -25,9 +25,13 @@ Or sign up from the app with `options.data` set (see `supabase/schema.sql` for t
 App.js                        role-based routing after login
 src/lib/supabase.js           Supabase client (reads .env via react-native-dotenv)
 src/screens/LoginScreen.js    Week 2 deliverable — email/password via Supabase Auth
-src/screens/BuyerHomeScreen.js    placeholder, Week 3
-src/screens/SellerHomeScreen.js   placeholder, Week 3
-src/screens/AgentHomeScreen.js    placeholder, Week 3
+src/screens/PropertyListScreen.js    Week 2 GUI 1/3 - browse list (search, sale/rent filter, favourites)
+src/screens/PropertyDetailScreen.js  Week 2 GUI 2/3 - property detail
+src/screens/CreatePropertyScreen.js  Week 2 GUI 3/3 - seller's create-property form
+src/screens/BuyerHomeScreen.js       list -> detail navigation (sample data for now)
+src/screens/SellerHomeScreen.js      "My Properties" + new-property form (sample data for now)
+src/screens/AgentHomeScreen.js       placeholder, Week 3
+src/components/, src/data/, src/utils/   shared UI pieces, sample properties, formatters
 supabase/schema.sql           profiles table + auto-create trigger (run first)
 supabase/schema_02_core_tables.sql   properties, offers, rental applications, enquiries,
                               favourites, viewings, status history + security rules (run second)
