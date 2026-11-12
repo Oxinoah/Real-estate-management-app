@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { colors } from '../theme';
 
 // Property photo. Shows the image at `uri` (property_images.url) or, when a
 // listing has no photo, the grey placeholder from the wireframe.
 export default function Photo({ uri, height = 120, width, label = 'PHOTO', style }) {
-  if (uri) {
+  const [failed, setFailed] = useState(false);
+  if (uri && !failed) {
     return (
       <Image
         source={{ uri }}
         resizeMode="cover"
+        onError={() => setFailed(true)}
         style={[{ height, width, backgroundColor: colors.placeholder }, style]}
       />
     );
