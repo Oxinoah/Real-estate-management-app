@@ -30,6 +30,8 @@ src/screens/PropertyDetailScreen.js  Week 2 GUI 2/3 - property detail
 src/screens/CreatePropertyScreen.js  Week 2 GUI 3/3 - seller's create-property form
 src/screens/BuyerHomeScreen.js       list -> detail navigation (sample data for now)
 src/screens/SellerHomeScreen.js      "My Properties" + new-property form (sample data for now)
+src/screens/BuyerActivityScreen.js   Buyer "My Activity" tab (empty sections until Week 3)
+src/screens/BuyerProfileScreen.js    Buyer "Profile" tab (account info + log out)
 src/screens/AgentHomeScreen.js       placeholder, Week 3
 src/components/, src/data/, src/utils/   shared UI pieces, sample properties, formatters
 supabase/schema.sql           profiles table + auto-create trigger (run first)

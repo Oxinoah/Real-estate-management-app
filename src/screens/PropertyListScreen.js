@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
 import Screen from '../components/Screen';
 import Photo from '../components/Photo';
+import TabBar, { BUYER_TABS } from '../components/TabBar';
 import { colors } from '../theme';
 import { formatPrice } from '../utils/format';
 
@@ -22,6 +23,10 @@ export default function PropertyListScreen({
   onToggleFavourite,
   onOpen,
   onLogout,
+  title = 'Browse Properties',
+  emptyText = 'No properties match your search.',
+  activeTab = 'browse',
+  onTabChange,
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
@@ -39,7 +44,7 @@ export default function PropertyListScreen({
       <View style={styles.header}>
         <View>
           <Text style={styles.role}>Buyer</Text>
-          <Text style={styles.title}>Browse Properties</Text>
+          <Text style={styles.title}>{title}</Text>
         </View>
         <Pressable onPress={onLogout}>
           <Text style={styles.logout}>Log out</Text>
@@ -71,7 +76,7 @@ export default function PropertyListScreen({
 
       <ScrollView contentContainerStyle={styles.list}>
         {shown.length === 0 ? (
-          <Text style={styles.empty}>No properties match your search.</Text>
+          <Text style={styles.empty}>{emptyText}</Text>
         ) : (
           shown.map((p) => {
             const isFav = favourites.includes(p.property_id);
@@ -102,12 +107,7 @@ export default function PropertyListScreen({
         )}
       </ScrollView>
 
-      <View style={styles.tabBar}>
-        <Text style={[styles.tab, styles.tabActive]}>Browse</Text>
-        <Text style={styles.tab}>Favourites</Text>
-        <Text style={styles.tab}>My Activity</Text>
-        <Text style={styles.tab}>Profile</Text>
-      </View>
+      <TabBar tabs={BUYER_TABS} active={activeTab} onChange={onTabChange} />
     </Screen>
   );
 }
@@ -169,13 +169,4 @@ const styles = StyleSheet.create({
   price: { fontSize: 14, fontWeight: '700', color: colors.text },
   heart: { fontSize: 18, color: '#bbb' },
   heartActive: { color: colors.text },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-    paddingTop: 8,
-    paddingBottom: 6,
-  },
-  tab: { flex: 1, textAlign: 'center', fontSize: 10, color: '#999' },
-  tabActive: { color: colors.text, fontWeight: '700' },
 });
