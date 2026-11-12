@@ -10,8 +10,8 @@ import { supabase } from '../lib/supabase';
 /**
  * GUI screen 2/3 — property detail (see wireframe "Property Detail").
  * Input: one property (same fields as the `properties` table).
- * Output: onBack(), onToggleFavourite(id). "Make offer" saves an offer in
- * Supabase; the other buttons are not wired yet.
+ * Output: onBack(), onToggleFavourite(id). "Make offer" and "Enquire" save
+ * to Supabase; the other buttons are not wired yet.
  */
 export default function PropertyDetailScreen({ property, session, isFavourite, onToggleFavourite, onBack }) {
   const [notice, setNotice] = useState(null);
@@ -20,9 +20,30 @@ export default function PropertyDetailScreen({ property, session, isFavourite, o
   const [offering, setOffering] = useState(false);
   const [amount, setAmount] = useState('');
   const [sending, setSending] = useState(false);
+  const [enquiring, setEnquiring] = useState(false);
+  const [message, setMessage] = useState('');
 
   function comingSoon(action) {
     setNotice(`${action} are not available yet.`);
+  }
+
+  async function submitEnquiry() {
+    if (!message.trim()) {
+      setNotice('Write your question first.');
+      return;
+    }
+    setSending(true);
+    const { error } = await supabase
+      .from('enquiries')
+      .insert({ property_id: property.property_id, buyer_id: session.user.id, message: message.trim() });
+    setSending(false);
+    if (error) {
+      setNotice(`Could not send your enquiry: ${error.message}`);
+      return;
+    }
+    setEnquiring(false);
+    setMessage('');
+    setNotice('Enquiry sent. The answer will appear in My Activity.');
   }
 
   async function submitOffer() {
@@ -87,6 +108,28 @@ export default function PropertyDetailScreen({ property, session, isFavourite, o
             <StatusBadge status={property.status} />
           </View>
 
+          {enquiring ? (
+            <View style={styles.offerBox}>
+              <Text style={styles.label}>Your question</Text>
+              <TextInput
+                style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+                multiline
+                placeholder="Ask the seller or agent about this property"
+                value={message}
+                onChangeText={setMessage}
+              />
+              <Pressable
+                style={[styles.button, styles.buttonFilled, sending && { opacity: 0.6 }]}
+                onPress={submitEnquiry}
+                disabled={sending}
+              >
+                <Text style={[styles.buttonText, styles.buttonTextFilled]}>
+                  {sending ? 'Sending…' : 'Send enquiry'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {offering ? (
             <View style={styles.offerBox}>
               <Text style={styles.label}>Your offer (€)</Text>
@@ -114,7 +157,13 @@ export default function PropertyDetailScreen({ property, session, isFavourite, o
       </ScrollView>
 
       <View style={styles.actions}>
-        <Pressable style={styles.button} onPress={() => comingSoon('Enquiries')}>
+        <Pressable
+          style={styles.button}
+          onPress={() => {
+            setOffering(false);
+            setEnquiring(true);
+          }}
+        >
           <Text style={styles.buttonText}>Enquire</Text>
         </Pressable>
         <Pressable style={styles.button} onPress={() => comingSoon('Viewing requests')}>
@@ -122,7 +171,7 @@ export default function PropertyDetailScreen({ property, session, isFavourite, o
         </Pressable>
         <Pressable
           style={[styles.button, styles.buttonFilled]}
-          onPress={() => (isRent ? comingSoon('Rental applications') : setOffering(true))}
+          onPress={() => (isRent ? comingSoon('Rental applications') : (setEnquiring(false), setOffering(true)))}
         >
           <Text style={[styles.buttonText, styles.buttonTextFilled]}>
             {isRent ? 'Apply to rent' : 'Make offer'}

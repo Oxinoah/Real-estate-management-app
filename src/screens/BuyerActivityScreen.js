@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabase';
 
 const SECTIONS = [
   { title: 'Rental applications', empty: 'You have not applied for any rental yet.' },
-  { title: 'Enquiries', empty: 'You have not sent any enquiries yet.' },
   { title: 'Viewing requests', empty: 'You have not requested any viewing yet.' },
 ];
 
@@ -18,6 +17,7 @@ const OFFER_STATUS = { pending: 'Pending', accepted: 'Accepted', rejected: 'Reje
 export default function BuyerActivityScreen({ session, onTabChange }) {
   const [offers, setOffers] = useState(null);
   const [error, setError] = useState(null);
+  const [enquiries, setEnquiries] = useState(null);
 
   useEffect(() => {
     supabase
@@ -29,6 +29,13 @@ export default function BuyerActivityScreen({ session, onTabChange }) {
         if (err) setError(err.message);
         else setOffers(data);
       });
+
+    supabase
+      .from('enquiries')
+      .select('enquiry_id, message, response, created_at, properties(title)')
+      .eq('buyer_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setEnquiries(data || []));
   }, []);
 
   return (
@@ -64,6 +71,25 @@ export default function BuyerActivityScreen({ session, onTabChange }) {
             ))
           )}
         </View>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Enquiries</Text>
+          {!enquiries ? (
+            <Text style={styles.empty}>Loading…</Text>
+          ) : enquiries.length === 0 ? (
+            <Text style={styles.empty}>You have not sent any enquiries yet.</Text>
+          ) : (
+            enquiries.map((e) => (
+              <View key={e.enquiry_id} style={[styles.offerRow, { flexDirection: 'column', gap: 3 }]}>
+                <Text style={styles.offerTitle}>{e.properties?.title}</Text>
+                <Text style={styles.empty}>“{e.message}”</Text>
+                <Text style={styles.empty}>
+                  {e.response ? `Answer: ${e.response}` : 'Waiting for an answer'}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+
         {SECTIONS.map((s) => (
           <View key={s.title} style={styles.card}>
             <Text style={styles.cardTitle}>{s.title}</Text>

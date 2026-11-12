@@ -8,8 +8,7 @@ import BuyerActivityScreen from './BuyerActivityScreen';
 import BuyerProfileScreen from './BuyerProfileScreen';
 
 // Buyer home: bottom tabs (Browse / Favourites / My Activity / Profile) and
-// the property detail. Properties come from Supabase; favourites are kept in
-// local state for now.
+// the property detail. Properties and favourites are stored in Supabase.
 export default function BuyerHomeScreen({ session, onLogout }) {
   const [tab, setTab] = useState('browse');
   const [selected, setSelected] = useState(null);
@@ -19,6 +18,14 @@ export default function BuyerHomeScreen({ session, onLogout }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    supabase
+      .from('favourites')
+      .select('property_id')
+      .eq('buyer_id', session.user.id)
+      .then(({ data }) => {
+        if (data) setFavourites(data.map((f) => f.property_id));
+      });
+
     supabase
       .from('properties')
       .select('*')
@@ -42,10 +49,21 @@ export default function BuyerHomeScreen({ session, onLogout }) {
 
   const published = properties;
 
-  function toggleFavourite(id) {
+  // Update the screen right away, then save in Supabase (undo if it fails).
+  async function toggleFavourite(id) {
+    const wasFavourite = favourites.includes(id);
     setFavourites((current) =>
-      current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
+      wasFavourite ? current.filter((x) => x !== id) : [...current, id]
     );
+    const query = supabase.from('favourites');
+    const { error: err } = wasFavourite
+      ? await query.delete().eq('buyer_id', session.user.id).eq('property_id', id)
+      : await query.insert({ buyer_id: session.user.id, property_id: id });
+    if (err) {
+      setFavourites((current) =>
+        wasFavourite ? [...current, id] : current.filter((x) => x !== id)
+      );
+    }
   }
 
   if (selected) {
