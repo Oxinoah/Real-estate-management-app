@@ -1,20 +1,36 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import Screen from '../components/Screen';
 import TabBar, { BUYER_TABS } from '../components/TabBar';
 import { colors } from '../theme';
+import { supabase } from '../lib/supabase';
 
 const SECTIONS = [
-  { title: 'Offers', empty: 'You have not made any offers yet.' },
   { title: 'Rental applications', empty: 'You have not applied for any rental yet.' },
   { title: 'Enquiries', empty: 'You have not sent any enquiries yet.' },
   { title: 'Viewing requests', empty: 'You have not requested any viewing yet.' },
 ];
 
-// Buyer "My Activity" tab (component "Track My Activity"). The sections are
-// empty for now; Week 3 fills them from offers, rental_applications,
-// enquiries and viewings.
-export default function BuyerActivityScreen({ onTabChange }) {
+const OFFER_STATUS = { pending: 'Pending', accepted: 'Accepted', rejected: 'Rejected' };
+
+// Buyer "My Activity" tab (component "Track My Activity"). Offers are read
+// from Supabase; the other sections are empty for now.
+export default function BuyerActivityScreen({ session, onTabChange }) {
+  const [offers, setOffers] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    supabase
+      .from('offers')
+      .select('offer_id, amount, status, created_at, properties(title, location)')
+      .eq('buyer_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data, error: err }) => {
+        if (err) setError(err.message);
+        else setOffers(data);
+      });
+  }, []);
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -23,6 +39,31 @@ export default function BuyerActivityScreen({ onTabChange }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.body}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Offers</Text>
+          {error ? (
+            <Text style={styles.empty}>Could not load offers: {error}</Text>
+          ) : !offers ? (
+            <Text style={styles.empty}>Loading…</Text>
+          ) : offers.length === 0 ? (
+            <Text style={styles.empty}>You have not made any offers yet.</Text>
+          ) : (
+            offers.map((o) => (
+              <View key={o.offer_id} style={styles.offerRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.offerTitle}>{o.properties?.title}</Text>
+                  <Text style={styles.empty}>
+                    {o.properties?.location} · {new Date(o.created_at).toLocaleDateString('en-GB')}
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.offerTitle}>€{Math.round(o.amount).toLocaleString('en-GB')}</Text>
+                  <Text style={styles.empty}>{OFFER_STATUS[o.status] || o.status}</Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
         {SECTIONS.map((s) => (
           <View key={s.title} style={styles.card}>
             <Text style={styles.cardTitle}>{s.title}</Text>
@@ -49,5 +90,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
+  offerRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingTop: 10,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  offerTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
   empty: { fontSize: 12, color: colors.muted },
 });

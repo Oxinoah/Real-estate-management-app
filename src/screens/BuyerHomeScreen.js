@@ -1,19 +1,46 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Text } from 'react-native';
+import Screen from '../components/Screen';
+import { supabase } from '../lib/supabase';
 import PropertyListScreen from './PropertyListScreen';
 import PropertyDetailScreen from './PropertyDetailScreen';
 import BuyerActivityScreen from './BuyerActivityScreen';
 import BuyerProfileScreen from './BuyerProfileScreen';
-import { MOCK_PROPERTIES } from '../data/mockProperties';
 
 // Buyer home: bottom tabs (Browse / Favourites / My Activity / Profile) and
-// the property detail. Favourites are kept in local state for now; Week 3
-// stores them in the `favourites` table.
+// the property detail. Properties come from Supabase; favourites are kept in
+// local state for now.
 export default function BuyerHomeScreen({ session, onLogout }) {
   const [tab, setTab] = useState('browse');
   const [selected, setSelected] = useState(null);
   const [favourites, setFavourites] = useState([]);
 
-  const published = MOCK_PROPERTIES.filter((p) => p.status !== 'draft');
+  const [properties, setProperties] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    supabase
+      .from('properties')
+      .select('*')
+      .neq('status', 'draft')
+      .order('created_at', { ascending: false })
+      .then(({ data, error: err }) => {
+        if (err) setError(err.message);
+        else setProperties(data);
+      });
+  }, []);
+
+  if (!properties) {
+    return (
+      <Screen>
+        <Text style={{ textAlign: 'center', marginTop: 80, color: '#777' }}>
+          {error ? `Could not load properties: ${error}` : 'Loading properties…'}
+        </Text>
+      </Screen>
+    );
+  }
+
+  const published = properties;
 
   function toggleFavourite(id) {
     setFavourites((current) =>
@@ -25,6 +52,7 @@ export default function BuyerHomeScreen({ session, onLogout }) {
     return (
       <PropertyDetailScreen
         property={selected}
+        session={session}
         isFavourite={favourites.includes(selected.property_id)}
         onToggleFavourite={toggleFavourite}
         onBack={() => setSelected(null)}
@@ -33,7 +61,7 @@ export default function BuyerHomeScreen({ session, onLogout }) {
   }
 
   if (tab === 'activity') {
-    return <BuyerActivityScreen onTabChange={setTab} />;
+    return <BuyerActivityScreen session={session} onTabChange={setTab} />;
   }
 
   if (tab === 'profile') {

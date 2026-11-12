@@ -1,23 +1,48 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
 import Screen from '../components/Screen';
 import Photo from '../components/Photo';
 import StatusBadge from '../components/StatusBadge';
 import { colors } from '../theme';
 import { formatPrice, transactionLabel } from '../utils/format';
+import { supabase } from '../lib/supabase';
 
 /**
  * GUI screen 2/3 — property detail (see wireframe "Property Detail").
  * Input: one property (same fields as the `properties` table).
- * Output: onBack(), onToggleFavourite(id). The three action buttons are
- * placeholders for the Week 3 Buyer features (enquiry, viewing, offer).
+ * Output: onBack(), onToggleFavourite(id). "Make offer" saves an offer in
+ * Supabase; the other buttons are not wired yet.
  */
-export default function PropertyDetailScreen({ property, isFavourite, onToggleFavourite, onBack }) {
+export default function PropertyDetailScreen({ property, session, isFavourite, onToggleFavourite, onBack }) {
   const [notice, setNotice] = useState(null);
   const isRent = property.transaction_type === 'rent';
 
+  const [offering, setOffering] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [sending, setSending] = useState(false);
+
   function comingSoon(action) {
-    setNotice(`${action} will be available in Week 3.`);
+    setNotice(`${action} are not available yet.`);
+  }
+
+  async function submitOffer() {
+    const value = Number(amount.replace(/[\s,]/g, ''));
+    if (!value || value <= 0) {
+      setNotice('Enter a valid offer amount.');
+      return;
+    }
+    setSending(true);
+    const { error } = await supabase
+      .from('offers')
+      .insert({ property_id: property.property_id, buyer_id: session.user.id, amount: value });
+    setSending(false);
+    if (error) {
+      setNotice(`Could not send your offer: ${error.message}`);
+      return;
+    }
+    setOffering(false);
+    setAmount('');
+    setNotice('Offer sent. You can follow it in My Activity.');
   }
 
   return (
@@ -62,6 +87,28 @@ export default function PropertyDetailScreen({ property, isFavourite, onToggleFa
             <StatusBadge status={property.status} />
           </View>
 
+          {offering ? (
+            <View style={styles.offerBox}>
+              <Text style={styles.label}>Your offer (€)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                placeholder="e.g. 470000"
+                value={amount}
+                onChangeText={setAmount}
+              />
+              <Pressable
+                style={[styles.button, styles.buttonFilled, sending && { opacity: 0.6 }]}
+                onPress={submitOffer}
+                disabled={sending}
+              >
+                <Text style={[styles.buttonText, styles.buttonTextFilled]}>
+                  {sending ? 'Sending…' : 'Send offer'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {notice ? <Text style={styles.notice}>{notice}</Text> : null}
         </View>
       </ScrollView>
@@ -75,7 +122,7 @@ export default function PropertyDetailScreen({ property, isFavourite, onToggleFa
         </Pressable>
         <Pressable
           style={[styles.button, styles.buttonFilled]}
-          onPress={() => comingSoon(isRent ? 'Rental applications' : 'Offers')}
+          onPress={() => (isRent ? comingSoon('Rental applications') : setOffering(true))}
         >
           <Text style={[styles.buttonText, styles.buttonTextFilled]}>
             {isRent ? 'Apply to rent' : 'Make offer'}
@@ -117,6 +164,16 @@ const styles = StyleSheet.create({
   },
   description: { fontSize: 13, color: '#555', lineHeight: 20 },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  offerBox: { gap: 8 },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    color: colors.text,
+  },
   notice: { fontSize: 12, color: colors.muted, textAlign: 'center' },
   actions: {
     flexDirection: 'row',
