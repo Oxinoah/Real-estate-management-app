@@ -1,42 +1,43 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Screen from '../components/Screen';
 import TabBar from '../components/TabBar';
+import { colors } from '../theme';
 import { supabase } from '../lib/supabase';
 import { createAgentService } from '../services/agent/agentService';
 import { AGENT_TABS } from '../utils/agent/rules';
-import { useAgentAction, useAgentResource } from '../hooks/agent/useAgentResource';
-import { AgentButton, AgentLoadState, AgentMessage, styles } from '../components/agent/AgentUI';
+import { AgentMessage } from '../components/agent/AgentUI';
 import AgentPropertyListScreen from './agent/AgentPropertyListScreen';
 import AgentPropertyDetailScreen from './agent/AgentPropertyDetailScreen';
 import AgentEnquiriesScreen from './agent/AgentEnquiriesScreen';
-import AgentDecisionsScreen from './agent/AgentDecisionsScreen';
+import AgentRequestsScreen from './agent/AgentRequestsScreen';
 import AgentStatsScreen from './agent/AgentStatsScreen';
 
-// Keep the public entry point and props compatible with App.js.
-export default function AgentHomeScreen({ session, onLogout }) {
-  if (session?.role !== 'agent' || !session?.user?.id) {
-    return <Screen><View style={styles.body}>
-      <AgentMessage error>An authenticated Agent profile is required.</AgentMessage>
-      <AgentButton title="Log out" onPress={onLogout} />
-    </View></Screen>;
-  }
-  return <AgentWorkspace key={session.user.id} session={session} onLogout={onLogout} />;
-}
+const SCOPES = [
+  { key: 'mine', label: 'My properties' },
+  { key: 'all', label: 'All properties' },
+];
 
-function AgentWorkspace({ session, onLogout }) {
+// Agent home: bottom tabs (Properties / Enquiries / Requests / Stats), the
+// property screen, and a "My properties / All properties" switch that applies
+// to every tab. Same layout as the Buyer and Seller homes.
+export default function AgentHomeScreen({ session, onLogout }) {
   const service = useMemo(() => createAgentService(supabase, session.user.id), [session.user.id]);
-  const access = useAgentResource(() => service.readiness(), [service]);
-  const logout = useAgentAction();
   const [tab, setTab] = useState('properties');
+  const [scope, setScope] = useState('mine');
   const [propertyId, setPropertyId] = useState(null);
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState(null);
   const mounted = useRef(true);
+
   useEffect(() => {
     mounted.current = true;
+    // Nothing assigned yet: start on all properties so the lists are not empty.
+    service.countAssigned().then((n) => {
+      if (mounted.current && n === 0) setScope('all');
+    }).catch(() => {});
     return () => { mounted.current = false; };
-  }, []);
+  }, [service]);
 
   function changed(message) {
     if (mounted.current) {
@@ -45,7 +46,7 @@ function AgentWorkspace({ session, onLogout }) {
     }
   }
 
-  const common = { service, revision, onChanged: changed };
+  const common = { service, scope, revision, onChanged: changed };
   let content;
   if (propertyId != null) {
     content = <AgentPropertyDetailScreen {...common} propertyId={propertyId} onBack={() => setPropertyId(null)} />;
@@ -53,32 +54,62 @@ function AgentWorkspace({ session, onLogout }) {
     content = <AgentPropertyListScreen {...common} onOpen={setPropertyId} />;
   } else if (tab === 'enquiries') {
     content = <AgentEnquiriesScreen {...common} />;
-  } else if (tab === 'stats') {
-    content = <AgentStatsScreen {...common} />;
+  } else if (tab === 'requests') {
+    content = <AgentRequestsScreen {...common} />;
   } else {
-    content = <AgentDecisionsScreen key={tab} {...common} kind={tab} />;
+    content = <AgentStatsScreen {...common} />;
   }
 
-  return <Screen>
-    <View style={styles.header}>
-      <Text style={styles.title}>Agent workspace</Text>
-      <Text style={styles.muted}>{session.fullName || 'Agent'}</Text>
-      <View style={styles.row}>
-        <AgentButton title={logout.busy ? 'Logging out…' : 'Log out'} disabled={logout.busy}
-          onPress={() => logout.run(onLogout, 'Signed out.')} />
-        <AgentButton title="Refresh access" disabled={access.loading} onPress={access.refresh} />
-      </View>
-      <AgentMessage error>{logout.error}</AgentMessage>
-      <AgentMessage>{notice}</AgentMessage>
-    </View>
-    <AgentLoadState resource={access}>{access.data ? content : null}</AgentLoadState>
-    {access.error ? <View style={styles.body}><AgentMessage>
-      Agent data and actions require the reviewed Agent database integration. No sample data is substituted.
-    </AgentMessage></View> : null}
-    {access.data ? <TabBar tabs={AGENT_TABS} active={tab} onChange={(next) => {
-      setPropertyId(null);
-      setNotice(null);
-      setTab(next);
-    }} /> : null}
-  </Screen>;
+  return (
+    <Screen>
+      {propertyId == null ? (
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.role}>Agent</Text>
+              <Text style={styles.title}>{session.fullName || 'Agent workspace'}</Text>
+            </View>
+            <Pressable onPress={onLogout}>
+              <Text style={styles.logout}>Log out</Text>
+            </Pressable>
+          </View>
+          <View style={styles.chips}>
+            {SCOPES.map((s) => (
+              <Pressable
+                key={s.key}
+                style={[styles.chip, scope === s.key && styles.chipActive]}
+                onPress={() => setScope(s.key)}
+              >
+                <Text style={[styles.chipText, scope === s.key && styles.chipTextActive]}>{s.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <AgentMessage>{notice}</AgentMessage>
+        </View>
+      ) : null}
+      <View style={{ flex: 1 }}>{content}</View>
+      <TabBar
+        tabs={AGENT_TABS}
+        active={tab}
+        onChange={(next) => {
+          setPropertyId(null);
+          setNotice(null);
+          setTab(next);
+        }}
+      />
+    </Screen>
+  );
 }
+
+const styles = StyleSheet.create({
+  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8, gap: 10 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  role: { fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: colors.muted },
+  title: { fontSize: 19, fontWeight: '700', color: colors.text },
+  logout: { fontSize: 12, color: colors.muted },
+  chips: { flexDirection: 'row', gap: 8 },
+  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12 },
+  chipActive: { backgroundColor: colors.text, borderColor: colors.text },
+  chipText: { fontSize: 12, color: colors.text },
+  chipTextActive: { color: '#fff', fontWeight: '600' },
+});
