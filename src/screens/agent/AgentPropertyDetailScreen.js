@@ -80,7 +80,7 @@ export default function AgentPropertyDetailScreen({ service, propertyId, revisio
                   }} />
                 <AgentButton title="Cancel" disabled={action.busy} onPress={() => setConfirm(null)} />
               </AgentCard> : null}
-              <AgentMessage>"Under offer" is set automatically when you accept a purchase offer (Requests tab).</AgentMessage>
+              <AgentMessage>"Under offer" is set automatically when you accept an offer or a rental application (Requests tab).</AgentMessage>
               <AgentMessage error>{action.error}</AgentMessage>
             </>}
 

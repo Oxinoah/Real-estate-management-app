@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canEditProperty, computeStats, propertyTransitions, validateProperty } from '../../src/utils/agent/rules.js';
+import { canDeleteProperty, canEditProperty, computeStats, isLocked, propertyTransitions, validateProperty } from '../../src/utils/agent/rules.js';
 import { createAgentService } from '../../src/services/agent/agentService.js';
 
 const base = { title: ' House ', description: 'd', price: '1200,50', transaction_type: 'rent', property_type: 'House', location: ' London ' };
@@ -23,10 +23,21 @@ test('invalid prices and empty fields are refused', () => {
 test('status moves follow the listing rules', () => {
   assert.deepEqual(propertyTransitions({ status: 'draft', transaction_type: 'sale' }).map((t) => t.status), ['active']);
   assert.deepEqual(propertyTransitions({ status: 'active', transaction_type: 'sale' }).map((t) => t.status), ['draft']);
-  assert.deepEqual(propertyTransitions({ status: 'active', transaction_type: 'rent' }).map((t) => t.status), ['draft', 'rented']);
-  assert.deepEqual(propertyTransitions({ status: 'under_offer', transaction_type: 'sale' }).map((t) => t.status), ['sold']);
+  assert.deepEqual(propertyTransitions({ status: 'active', transaction_type: 'rent' }).map((t) => t.status), ['draft']);
+  assert.deepEqual(propertyTransitions({ status: 'under_offer', transaction_type: 'sale' }).map((t) => t.status), ['sold', 'active']);
+  assert.deepEqual(propertyTransitions({ status: 'under_offer', transaction_type: 'rent' }).map((t) => t.status), ['rented', 'active']);
   for (const status of ['sold', 'rented']) assert.deepEqual(propertyTransitions({ status, transaction_type: 'sale' }), []);
   assert.equal(canEditProperty({ status: 'under_offer' }), false);
+});
+
+test('price, type and location are locked after an offer; deleting only before a deal', () => {
+  assert.equal(isLocked({ status: 'active' }, 'price'), false);
+  for (const field of ['price', 'transaction_type', 'property_type', 'location']) {
+    assert.equal(isLocked({ status: 'under_offer' }, field), true, field);
+  }
+  assert.equal(isLocked({ status: 'under_offer' }, 'title'), false);
+  assert.equal(canDeleteProperty({ status: 'draft' }), true);
+  assert.equal(canDeleteProperty({ status: 'under_offer' }), false);
 });
 
 test('statistics: active listings per seller, average price, offers per property', () => {

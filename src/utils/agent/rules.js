@@ -11,18 +11,33 @@ export function canEditProperty(property) {
   return ['draft', 'active'].includes(property.status);
 }
 
-// Status changes an agent can make from the property screen. The database
-// also refuses any change once a property is sold or rented. "Under offer" is
-// set by accepting an offer, never by hand.
+// Once a property is under offer these fields are frozen (the database
+// refuses the change too, see supabase/schema_04_lifecycle.sql).
+export const LOCKED_AFTER_OFFER = ['price', 'transaction_type', 'property_type', 'location'];
+
+export function isLocked(property, field) {
+  return property.status !== 'draft' && property.status !== 'active' && LOCKED_AFTER_OFFER.includes(field);
+}
+
+// A listing can only be deleted before a deal is in progress.
+export function canDeleteProperty(property) {
+  return ['draft', 'active'].includes(property.status);
+}
+
+// Status changes that can be made by hand from a property screen:
+//   Draft -> Active -> Under offer -> Sold (sale) / Rented (rent)
+// "Under offer" is set by accepting an offer or a rental application, never by
+// hand. Sold and Rented are final. The database checks the same rules.
 export function propertyTransitions(property) {
   const rent = property.transaction_type === 'rent';
   if (property.status === 'draft') return [{ status: 'active', label: 'Publish listing' }];
-  if (property.status === 'active') {
-    const moves = [{ status: 'draft', label: 'Withdraw listing (back to draft)' }];
-    if (rent) moves.push({ status: 'rented', label: 'Mark as rented' });
-    return moves;
+  if (property.status === 'active') return [{ status: 'draft', label: 'Withdraw listing (back to draft)' }];
+  if (property.status === 'under_offer') {
+    return [
+      rent ? { status: 'rented', label: 'Complete rental' } : { status: 'sold', label: 'Complete sale' },
+      { status: 'active', label: 'Deal fell through (back to active)' },
+    ];
   }
-  if (property.status === 'under_offer' && !rent) return [{ status: 'sold', label: 'Complete sale' }];
   return [];
 }
 

@@ -18,7 +18,7 @@ const COPY = {
   },
   applications: {
     empty: 'No rental applications.',
-    hint: 'Accepting an application rejects the other pending ones and marks the property as rented.',
+    hint: 'Accepting an application rejects the other pending ones and sets the property to "Under offer". Complete the rental from the property screen.',
     yes: 'Accept application', no: 'Reject application',
   },
   viewings: {
