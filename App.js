@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LoginScreen from './src/screens/LoginScreen';
 import BuyerHomeScreen from './src/screens/BuyerHomeScreen';
 import SellerHomeScreen from './src/screens/SellerHomeScreen';
@@ -7,6 +8,15 @@ import AgentHomeScreen from './src/screens/AgentHomeScreen';
 import { supabase } from './src/lib/supabase';
 
 export default function App() {
+  return (
+    // Needed by the SafeAreaView in src/components/Screen.js (crashes on web without it).
+    <SafeAreaProvider>
+      <Root />
+    </SafeAreaProvider>
+  );
+}
+
+function Root() {
   // { user, role: 'buyer' | 'seller' | 'agent', fullName }
   const [session, setSession] = useState(null);
 
