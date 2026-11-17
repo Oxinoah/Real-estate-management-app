@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -24,11 +24,13 @@ import { loadProfile } from '../lib/profile';
 export default function LoginScreen({ onLoggedIn, onSignUp }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const passwordRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
 
   async function handleLogin() {
+    if (loading) return;
     setError(null);
     setInfo(null);
 
@@ -99,8 +101,11 @@ export default function LoginScreen({ onLoggedIn, onSignUp }) {
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current && passwordRef.current.focus()}
           />
           <TextInput
+            ref={passwordRef}
             style={styles.input}
             placeholder="Password"
             placeholderTextColor="#999"
@@ -108,6 +113,8 @@ export default function LoginScreen({ onLoggedIn, onSignUp }) {
             autoComplete="password"
             value={password}
             onChangeText={setPassword}
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
           />
           <Pressable onPress={handleForgot} style={styles.forgotWrap}>
             <Text style={styles.forgot}>Forgot password?</Text>
