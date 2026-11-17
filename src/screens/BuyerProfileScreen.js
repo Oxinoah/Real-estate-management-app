@@ -4,12 +4,12 @@ import Screen from '../components/Screen';
 import TabBar, { BUYER_TABS } from '../components/TabBar';
 import { colors } from '../theme';
 
-// Buyer "Profile" tab: who is signed in, and log out.
-export default function BuyerProfileScreen({ session, onTabChange, onLogout }) {
+// "Profile" tab (Buyer and Seller): who is signed in, and log out.
+export default function BuyerProfileScreen({ session, onTabChange, onLogout, roleLabel = 'Buyer', tabs = BUYER_TABS }) {
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={styles.role}>Buyer</Text>
+        <Text style={styles.role}>{roleLabel}</Text>
         <Text style={styles.title}>Profile</Text>
       </View>
 
@@ -20,7 +20,7 @@ export default function BuyerProfileScreen({ session, onTabChange, onLogout }) {
           <Text style={[styles.label, styles.gap]}>Email</Text>
           <Text style={styles.value}>{session.user?.email || '—'}</Text>
           <Text style={[styles.label, styles.gap]}>Role</Text>
-          <Text style={styles.value}>Buyer</Text>
+          <Text style={styles.value}>{roleLabel}</Text>
         </View>
 
         <Pressable style={styles.button} onPress={onLogout}>
@@ -28,7 +28,7 @@ export default function BuyerProfileScreen({ session, onTabChange, onLogout }) {
         </Pressable>
       </View>
 
-      <TabBar tabs={BUYER_TABS} active="profile" onChange={onTabChange} />
+      <TabBar tabs={tabs} active="profile" onChange={onTabChange} />
     </Screen>
   );
 }
