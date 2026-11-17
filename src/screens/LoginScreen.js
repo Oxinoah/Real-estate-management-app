@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { loadProfile } from '../lib/profile';
 
 /**
  * Login component (see Component Diagram: "Login"), laid out like the
@@ -18,9 +19,9 @@ import { supabase } from '../lib/supabase';
  * Database: supabase.auth.signInWithPassword, then a lookup in `profiles`
  *   to resolve the role (buyer / seller / agent) the app needs to route on.
  * Output: calls onLoggedIn({ user, role, fullName }) so the parent can show
- *   the right home screen.
+ *   the right home screen; onSignUp() opens the Sign up screen.
  */
-export default function LoginScreen({ onLoggedIn }) {
+export default function LoginScreen({ onLoggedIn, onSignUp }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,20 +48,16 @@ export default function LoginScreen({ onLoggedIn }) {
       return;
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, full_name')
-      .eq('id', data.user.id)
-      .single();
+    const session = await loadProfile(data.user);
 
     setLoading(false);
 
-    if (profileError || !profile) {
+    if (!session) {
       setError('Logged in, but no profile row was found for this account.');
       return;
     }
 
-    onLoggedIn({ user: data.user, role: profile.role, fullName: profile.full_name });
+    onLoggedIn(session);
   }
 
   return (
@@ -110,9 +107,11 @@ export default function LoginScreen({ onLoggedIn }) {
           </Pressable>
         </View>
 
-        <Text style={styles.footer}>
-          Don't have an account? <Text style={styles.footerLink}>Sign up</Text>
-        </Text>
+        <Pressable onPress={onSignUp} style={styles.footerWrap}>
+          <Text style={styles.footer}>
+            Don't have an account? <Text style={styles.footerLink}>Sign up</Text>
+          </Text>
+        </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
@@ -161,8 +160,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  footerWrap: { marginTop: 'auto' },
   footer: {
-    marginTop: 'auto',
     textAlign: 'center',
     fontSize: 12,
     color: '#888',
