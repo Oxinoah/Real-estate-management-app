@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Text } from 'react-native';
 import Screen from '../components/Screen';
 import { supabase } from '../lib/supabase';
@@ -17,6 +17,22 @@ export default function BuyerHomeScreen({ session, onLogout }) {
   const [properties, setProperties] = useState(null);
   const [error, setError] = useState(null);
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Reads the published listings (with photos) from Supabase.
+  const loadProperties = useCallback(async () => {
+    const { data, error: err } = await supabase
+      .from('properties')
+      .select('*, property_images(url)')
+      .neq('status', 'draft')
+      .order('created_at', { ascending: false });
+    if (err) setError(err.message);
+    else {
+      setError(null);
+      setProperties(data);
+    }
+  }, []);
+
   useEffect(() => {
     supabase
       .from('favourites')
@@ -25,17 +41,20 @@ export default function BuyerHomeScreen({ session, onLogout }) {
       .then(({ data }) => {
         if (data) setFavourites(data.map((f) => f.property_id));
       });
-
-    supabase
-      .from('properties')
-      .select('*, property_images(url)')
-      .neq('status', 'draft')
-      .order('created_at', { ascending: false })
-      .then(({ data, error: err }) => {
-        if (err) setError(err.message);
-        else setProperties(data);
-      });
+    loadProperties();
   }, []);
+
+  // Pull to refresh on the lists: new listings and status changes appear.
+  async function refresh() {
+    setRefreshing(true);
+    await loadProperties();
+    setRefreshing(false);
+  }
+
+  function changeTab(next) {
+    setTab(next);
+    if (next === 'browse' || next === 'favourites') loadProperties();
+  }
 
   if (!properties) {
     return (
@@ -73,17 +92,20 @@ export default function BuyerHomeScreen({ session, onLogout }) {
         session={session}
         isFavourite={favourites.includes(selected.property_id)}
         onToggleFavourite={toggleFavourite}
-        onBack={() => setSelected(null)}
+        onBack={() => {
+          setSelected(null);
+          loadProperties();
+        }}
       />
     );
   }
 
   if (tab === 'activity') {
-    return <BuyerActivityScreen session={session} onTabChange={setTab} />;
+    return <BuyerActivityScreen session={session} onTabChange={changeTab} />;
   }
 
   if (tab === 'profile') {
-    return <BuyerProfileScreen session={session} onTabChange={setTab} onLogout={onLogout} />;
+    return <BuyerProfileScreen session={session} onTabChange={changeTab} onLogout={onLogout} />;
   }
 
   if (tab === 'favourites') {
@@ -97,7 +119,9 @@ export default function BuyerHomeScreen({ session, onLogout }) {
         onOpen={setSelected}
         onLogout={onLogout}
         activeTab="favourites"
-        onTabChange={setTab}
+        refreshing={refreshing}
+        onRefresh={refresh}
+        onTabChange={changeTab}
       />
     );
   }
@@ -110,7 +134,9 @@ export default function BuyerHomeScreen({ session, onLogout }) {
       onOpen={setSelected}
       onLogout={onLogout}
       activeTab="browse"
-      onTabChange={setTab}
+      refreshing={refreshing}
+      onRefresh={refresh}
+      onTabChange={changeTab}
     />
   );
 }

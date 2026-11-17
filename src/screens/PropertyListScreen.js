@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import Screen from '../components/Screen';
 import Photo from '../components/Photo';
 import TabBar, { BUYER_TABS } from '../components/TabBar';
@@ -27,6 +27,8 @@ export default function PropertyListScreen({
   emptyText = 'No properties match your search.',
   activeTab = 'browse',
   onTabChange,
+  refreshing = false,
+  onRefresh,
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
@@ -118,7 +120,10 @@ export default function PropertyListScreen({
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.list}>
+      <ScrollView
+        contentContainerStyle={styles.list}
+        refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
+      >
         {shown.length === 0 ? (
           <Text style={styles.empty}>{emptyText}</Text>
         ) : (
