@@ -29,7 +29,7 @@ export default function BuyerHomeScreen({ session, onLogout }) {
     supabase
       .from('properties')
       .select('*, property_images(url)')
-      .neq('status', 'draft')
+      .in('status', ['active', 'under_offer']) // sold, rented and draft listings are hidden
       .order('created_at', { ascending: false })
       .then(({ data, error: err }) => {
         if (err) setError(err.message);
