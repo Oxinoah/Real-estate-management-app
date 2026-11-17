@@ -1,107 +1,137 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Screen from '../components/Screen';
-import Photo from '../components/Photo';
-import StatusBadge from '../components/StatusBadge';
-import CreatePropertyScreen from './CreatePropertyScreen';
-import { MOCK_PROPERTIES } from '../data/mockProperties';
+import TabBar from '../components/TabBar';
 import { colors } from '../theme';
+import { supabase } from '../lib/supabase';
+import { createSellerService } from '../services/seller/sellerService';
+import { AgentMessage } from '../components/agent/AgentUI';
+import CreatePropertyScreen from './CreatePropertyScreen';
+import BuyerProfileScreen from './BuyerProfileScreen';
+import SellerPropertyListScreen from './seller/SellerPropertyListScreen';
+import SellerPropertyDetailScreen from './seller/SellerPropertyDetailScreen';
+import AgentRequestsScreen from './agent/AgentRequestsScreen';
+import AgentEnquiriesScreen from './agent/AgentEnquiriesScreen';
 
-// Seller home ("My Properties" in the wireframe) with the "+ New Property"
-// form. The list lives in local state for now; Week 3 reads and writes the
-// `properties` table.
-export default function SellerHomeScreen({ onLogout }) {
-  const [creating, setCreating] = useState(false);
-  const [properties, setProperties] = useState(MOCK_PROPERTIES.slice(0, 3));
+export const SELLER_TABS = [
+  { key: 'properties', label: 'Properties' },
+  { key: 'requests', label: 'Requests' },
+  { key: 'enquiries', label: 'Enquiries' },
+  { key: 'profile', label: 'Profile' },
+];
 
-  function addProperty(values, status) {
-    const nextId = properties.reduce((max, p) => Math.max(max, p.property_id), 0) + 1;
-    setProperties([{ property_id: nextId, status, ...values }, ...properties]);
-    setCreating(false);
+// Seller home: bottom tabs (Properties / Requests / Enquiries / Profile), the
+// property screen and the create / edit form. Everything is read from and
+// saved to Supabase. The Requests and Enquiries screens are shared with the
+// Agent (same functions in sellerService and agentService).
+export default function SellerHomeScreen({ session, onLogout }) {
+  const service = useMemo(() => createSellerService(supabase, session.user.id), [session.user.id]);
+  const [tab, setTab] = useState('properties');
+  const [propertyId, setPropertyId] = useState(null);
+  const [form, setForm] = useState(null); // { property, photos } when editing, {} when creating
+  const [revision, setRevision] = useState(0);
+  const [notice, setNotice] = useState(null);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  function changed(message) {
+    if (mounted.current) {
+      setNotice(message);
+      setRevision((value) => value + 1);
+    }
   }
 
-  if (creating) {
-    return <CreatePropertyScreen onSubmit={addProperty} onCancel={() => setCreating(false)} />;
+  function changeTab(next) {
+    setPropertyId(null);
+    setNotice(null);
+    setTab(next);
+  }
+
+  if (form) {
+    return (
+      <CreatePropertyScreen
+        property={form.property}
+        photos={form.photos}
+        onCancel={() => setForm(null)}
+        onSubmit={async (values, status, photos) => {
+          if (form.property) {
+            await service.updateProperty(form.property, values, photos);
+            changed('Listing saved.');
+          } else {
+            const created = await service.createProperty(values, status, photos);
+            changed(status === 'active' ? 'Listing published.' : 'Draft saved.');
+            setPropertyId(created.property_id);
+          }
+          setForm(null);
+        }}
+      />
+    );
+  }
+
+  if (tab === 'profile') {
+    return (
+      <BuyerProfileScreen session={session} onLogout={onLogout} onTabChange={changeTab}
+        roleLabel="Seller" tabs={SELLER_TABS} />
+    );
+  }
+
+  const common = { service, scope: 'mine', revision, onChanged: changed };
+  let content;
+  if (propertyId != null) {
+    content = (
+      <SellerPropertyDetailScreen
+        {...common}
+        propertyId={propertyId}
+        onBack={() => { setNotice(null); setPropertyId(null); }}
+        onEdit={(property, photos) => setForm({ property, photos })}
+        onDeleted={() => setPropertyId(null)}
+      />
+    );
+  } else if (tab === 'requests') {
+    content = <AgentRequestsScreen {...common} />;
+  } else if (tab === 'enquiries') {
+    content = <AgentEnquiriesScreen {...common} />;
+  } else {
+    content = (
+      <SellerPropertyListScreen {...common} onOpen={setPropertyId} onCreate={() => { setNotice(null); setForm({}); }} />
+    );
   }
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.role}>Seller</Text>
-          <Text style={styles.title}>My Properties</Text>
-        </View>
-        <Pressable onPress={onLogout}>
-          <Text style={styles.logout}>Log out</Text>
-        </Pressable>
-      </View>
-
-      <Pressable style={styles.newButton} onPress={() => setCreating(true)}>
-        <Text style={styles.newButtonText}>+ New Property</Text>
-      </Pressable>
-
-      <ScrollView contentContainerStyle={styles.list}>
-        {properties.map((p) => (
-          <View key={p.property_id} style={styles.row}>
-            <Photo width={96} height={96} />
-            <View style={styles.rowBody}>
-              <Text style={styles.rowTitle}>{p.title}</Text>
-              <Text style={styles.rowMeta}>{p.location}</Text>
-              <StatusBadge status={p.status} />
+      {propertyId == null ? (
+        <View style={styles.header}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.role}>Seller</Text>
+              <Text style={styles.title}>
+                {{ properties: 'My Properties', requests: 'Offers & Requests', enquiries: 'Enquiries' }[tab]}
+              </Text>
             </View>
+            <Pressable onPress={onLogout}>
+              <Text style={styles.logout}>Log out</Text>
+            </Pressable>
           </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.tabBar}>
-        <Text style={[styles.tab, styles.tabActive]}>Properties</Text>
-        <Text style={styles.tab}>Offers</Text>
-        <Text style={styles.tab}>Profile</Text>
-      </View>
+          <AgentMessage>{notice}</AgentMessage>
+        </View>
+      ) : notice ? (
+        <View style={styles.noticeBar}><AgentMessage>{notice}</AgentMessage></View>
+      ) : null}
+      <View style={{ flex: 1 }}>{content}</View>
+      <TabBar tabs={SELLER_TABS} active={tab} onChange={changeTab} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
+  header: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4, gap: 8 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   role: { fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: colors.muted },
   title: { fontSize: 19, fontWeight: '700', color: colors.text },
   logout: { fontSize: 12, color: colors.muted },
-  newButton: {
-    marginHorizontal: 20,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  newButtonText: { fontSize: 13, fontWeight: '600', color: colors.text },
-  list: { paddingHorizontal: 20, paddingBottom: 16, gap: 14 },
-  row: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  rowBody: { flex: 1, paddingVertical: 10, paddingHorizontal: 12, gap: 5 },
-  rowTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
-  rowMeta: { fontSize: 11, color: colors.muted },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-    paddingTop: 8,
-    paddingBottom: 6,
-  },
-  tab: { flex: 1, textAlign: 'center', fontSize: 10, color: '#999' },
-  tabActive: { color: colors.text, fontWeight: '700' },
+  noticeBar: { paddingHorizontal: 20, paddingTop: 10 },
 });

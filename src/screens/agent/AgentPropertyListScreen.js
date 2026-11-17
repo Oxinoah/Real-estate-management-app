@@ -1,23 +1,51 @@
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View, Pressable, StyleSheet } from 'react-native';
+import Photo from '../../components/Photo';
 import StatusBadge from '../../components/StatusBadge';
-import { AgentButton, AgentCard, AgentLoadState, styles } from '../../components/agent/AgentUI';
+import { AgentLoadState, styles as ui } from '../../components/agent/AgentUI';
 import { useAgentResource } from '../../hooks/agent/useAgentResource';
-import { money } from '../../utils/agent/rules';
+import { colors } from '../../theme';
+import { formatPrice } from '../../utils/format';
 
-export default function AgentPropertyListScreen({ service, revision, onOpen }) {
-  const resource = useAgentResource(() => service.loadPortfolio(), [service, revision]);
-  return <ScrollView contentContainerStyle={styles.body}>
-    <Text style={styles.heading}>Assigned properties</Text>
-    <AgentButton title="Refresh properties" disabled={resource.loading} onPress={resource.refresh} />
-    <AgentLoadState resource={resource} empty="No properties are assigned to you.">
-      {resource.data?.map((property) => <AgentCard key={property.property_id}>
-        <Text style={styles.heading}>{property.title}</Text>
-        <Text style={styles.text}>{property.location} · {property.property_type}</Text>
-        <Text style={styles.text}>{money(property.price)}{property.transaction_type === 'rent' ? ' / month · For rent' : ' · For sale'}</Text>
-        <View style={styles.row}><StatusBadge status={property.status} /></View>
-        <AgentButton title="Open property" onPress={() => onOpen(property.property_id)} />
-      </AgentCard>)}
-    </AgentLoadState>
-  </ScrollView>;
+// Agent "Properties" tab: the listings the agent manages, as cards like the
+// Buyer list (photo, title, location, price, status).
+export default function AgentPropertyListScreen({ service, scope, revision, onOpen }) {
+  const resource = useAgentResource(() => service.loadPortfolio(scope), [service, scope, revision]);
+  return (
+    <ScrollView contentContainerStyle={styles.list}>
+      <AgentLoadState
+        resource={resource}
+        empty={scope === 'mine'
+          ? 'No property is assigned to you yet. Switch to "All properties" and open one to take it on.'
+          : 'There are no properties yet.'}
+      >
+        {resource.data?.map((p) => (
+          <Pressable key={p.property_id} style={styles.card} onPress={() => onOpen(p.property_id)}>
+            <Photo uri={p.property_images?.[0]?.url} height={120} />
+            <View style={styles.body}>
+              <Text style={styles.cardTitle}>{p.title}</Text>
+              <Text style={styles.meta}>
+                {p.location} · {p.property_type}
+              </Text>
+              <Text style={styles.meta}>Seller: {p.seller?.full_name || '—'}</Text>
+              <View style={styles.footer}>
+                <Text style={styles.price}>{formatPrice(p)}</Text>
+                <StatusBadge status={p.status} />
+              </View>
+            </View>
+          </Pressable>
+        ))}
+      </AgentLoadState>
+    </ScrollView>
+  );
 }
+
+const styles = StyleSheet.create({
+  list: { ...ui.body, gap: 14 },
+  card: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' },
+  body: { paddingVertical: 10, paddingHorizontal: 12, gap: 3 },
+  cardTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
+  meta: { fontSize: 12, color: colors.muted },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 },
+  price: { fontSize: 14, fontWeight: '700', color: colors.text },
+});
