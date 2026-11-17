@@ -16,6 +16,9 @@ import { supabase } from '../lib/supabase';
  */
 export default function PropertyDetailScreen({ property, session, isFavourite, onToggleFavourite, onBack }) {
   const isRent = property.transaction_type === 'rent';
+  // Offers / applications only on active listings; viewings until the deal is done.
+  const canApply = property.status === 'active';
+  const canVisit = ['active', 'under_offer'].includes(property.status);
   const images = (property.property_images || []).map((i) => i.url);
 
   const [photo, setPhoto] = useState(0);
@@ -153,6 +156,14 @@ export default function PropertyDetailScreen({ property, session, isFavourite, o
             <StatusBadge status={property.status} />
           </View>
 
+          {!canApply ? (
+            <Text style={styles.notice}>
+              {property.status === 'under_offer'
+                ? 'This property is under offer: new offers and applications are closed for now.'
+                : 'This property is no longer available.'}
+            </Text>
+          ) : null}
+
           {mode ? (
             <View style={styles.panel}>
               {mode === 'enquiry'
@@ -210,11 +221,16 @@ export default function PropertyDetailScreen({ property, session, isFavourite, o
         <Pressable style={[styles.button, mode === 'enquiry' && styles.buttonOn]} onPress={() => open('enquiry')}>
           <Text style={styles.buttonText}>Enquire</Text>
         </Pressable>
-        <Pressable style={[styles.button, mode === 'viewing' && styles.buttonOn]} onPress={() => open('viewing')}>
+        <Pressable
+          style={[styles.button, mode === 'viewing' && styles.buttonOn, !canVisit && styles.buttonOff]}
+          disabled={!canVisit}
+          onPress={() => open('viewing')}
+        >
           <Text style={styles.buttonText}>Request viewing</Text>
         </Pressable>
         <Pressable
-          style={[styles.button, styles.buttonFilled]}
+          style={[styles.button, styles.buttonFilled, !canApply && styles.buttonOff]}
+          disabled={!canApply}
           onPress={() => open(isRent ? 'rental' : 'offer')}
         >
           <Text style={[styles.buttonText, styles.buttonTextFilled]}>
@@ -285,6 +301,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonOn: { backgroundColor: colors.divider },
+  buttonOff: { opacity: 0.35 },
   buttonFilled: { backgroundColor: colors.text },
   buttonText: { fontSize: 11, fontWeight: '600', color: colors.text },
   buttonTextFilled: { color: '#fff' },
