@@ -109,3 +109,62 @@ export function computeStats(properties, offers) {
     })),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Several properties at once (Week 4: agent multi-property access)
+// ---------------------------------------------------------------------------
+
+// What is still waiting for an answer on one property. Uses the rows loaded
+// with it by agentService.loadPortfolio (offers, rental applications,
+// viewings and enquiries, with only their status / response).
+export function pendingWork(property) {
+  const count = (rows, waiting) => (rows || []).filter(waiting).length;
+  const offers = count(property.offers, (r) => r.status === 'pending');
+  const applications = count(property.rental_applications, (r) => r.status === 'pending');
+  const viewings = count(property.viewings, (r) => r.status === 'requested');
+  const enquiries = count(property.enquiries, (r) => !String(r.response ?? '').trim());
+  return { offers, applications, viewings, enquiries, total: offers + applications + viewings + enquiries };
+}
+
+// One line for the top of the Properties tab: how many listings, by status,
+// and how many requests are waiting across all of them.
+export function portfolioSummary(properties) {
+  const byStatus = { draft: 0, active: 0, under_offer: 0, sold: 0, rented: 0 };
+  let waiting = 0;
+  for (const p of properties) {
+    if (p.status in byStatus) byStatus[p.status] += 1;
+    waiting += pendingWork(p).total;
+  }
+  return { count: properties.length, byStatus, waiting };
+}
+
+// Status filter + search (title, location or seller) + sort.
+// sort: 'recent' (newest first, as loaded) or 'attention' (most requests waiting first).
+export function filterPortfolio(properties, { status = 'all', search = '', sort = 'recent' } = {}) {
+  const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = properties.filter((p) => {
+    if (status !== 'all' && p.status !== status) return false;
+    const text = `${p.title} ${p.location} ${p.seller?.full_name || ''}`.toLowerCase();
+    return words.every((w) => text.includes(w));
+  });
+  if (sort === 'attention') {
+    return shown
+      .map((p, i) => ({ p, i, n: pendingWork(p).total }))
+      .sort((a, b) => b.n - a.n || a.i - b.i)
+      .map((x) => x.p);
+  }
+  return shown;
+}
+
+// Position of a property in the list the agent came from, for the
+// "Previous / Next" buttons of the property screen.
+export function neighbours(ids, id) {
+  const index = ids.indexOf(id);
+  if (index === -1) return { index: -1, total: ids.length, previous: null, next: null };
+  return {
+    index,
+    total: ids.length,
+    previous: index > 0 ? ids[index - 1] : null,
+    next: index < ids.length - 1 ? ids[index + 1] : null,
+  };
+}
