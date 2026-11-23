@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { AgentButton, AgentCard, AgentField, AgentLoadState, AgentMessage, styles } from '../../components/agent/AgentUI';
+import { AgentButton, AgentCard, AgentField, AgentLoadState, AgentMessage, PropertyFilter, styles } from '../../components/agent/AgentUI';
 import { useAgentAction, useAgentResource } from '../../hooks/agent/useAgentResource';
 import { dateTime } from '../../utils/agent/rules';
 
 // Agent "Enquiries" tab: buyer questions on the properties in scope, with a
 // reply box. The reply appears in the buyer's My Activity.
-export default function AgentEnquiriesScreen({ service, scope, revision, onChanged }) {
+// `focus` (optional) starts the tab filtered on one property.
+export default function AgentEnquiriesScreen({ service, scope, revision, onChanged, focus = null }) {
   const resource = useAgentResource(() => service.loadEnquiries(scope), [service, scope, revision]);
-  const [filter, setFilter] = useState('all');
-  const shown = resource.data?.filter((row) => filter === 'all' || (filter === 'answered' ? !!row.response?.trim() : !row.response?.trim()));
+  const [filter, setFilter] = useState(focus == null ? 'all' : 'waiting');
+  const [only, setOnly] = useState(focus);
+  const shown = resource.data?.filter((row) => only == null || row.property_id === only)
+    .filter((row) => filter === 'all' || (filter === 'answered' ? !!row.response?.trim() : !row.response?.trim()));
   return <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
     <View style={styles.row}>{['all', 'waiting', 'answered'].map((value) => <AgentButton
       key={value} title={value} primary={filter === value} onPress={() => setFilter(value)} />)}</View>
+    <PropertyFilter rows={resource.data} value={only} onChange={setOnly} />
     <AgentLoadState resource={resource} empty={scope === 'mine' ? 'No enquiries on your properties.' : 'No enquiries yet.'}>
       {shown?.length === 0 && resource.data?.length ? <AgentMessage>No enquiries match this filter.</AgentMessage> : null}
       {shown?.map((row) => <EnquiryCard key={row.enquiry_id} enquiry={row} service={service} onChanged={onChanged} />)}

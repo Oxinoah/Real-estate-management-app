@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { AgentButton, AgentCard, AgentLoadState, AgentMessage, styles } from '../../components/agent/AgentUI';
+import { AgentButton, AgentCard, AgentLoadState, AgentMessage, PropertyFilter, styles } from '../../components/agent/AgentUI';
 import { useAgentAction, useAgentResource } from '../../hooks/agent/useAgentResource';
 import { dateTime, money } from '../../utils/agent/rules';
 
@@ -30,20 +30,26 @@ const COPY = {
 
 // Agent "Requests" tab: what buyers sent (purchase offers, rental
 // applications, viewing requests), with accept / reject buttons.
-export default function AgentRequestsScreen({ service, scope, revision, onChanged }) {
-  const [kind, setKind] = useState('offers');
+// `focus` (optional) starts the tab filtered on one property; the chips let
+// the agent switch between the properties that have requests.
+export default function AgentRequestsScreen({ service, scope, revision, onChanged, focus = null, initialKind = null }) {
+  const [kind, setKind] = useState(initialKind || 'offers');
+  const [only, setOnly] = useState(focus);
   const resource = useAgentResource(() => {
     if (kind === 'applications') return service.loadApplications(scope);
     if (kind === 'viewings') return service.loadViewings(scope);
     return service.loadOffers(scope);
   }, [service, scope, revision, kind]);
   const copy = COPY[kind];
+  const shown = resource.data?.filter((row) => only == null || row.property_id === only);
   return <ScrollView contentContainerStyle={styles.body}>
     <View style={styles.row}>{KINDS.map((k) => <AgentButton key={k.key} title={k.label}
       primary={kind === k.key} onPress={() => setKind(k.key)} />)}</View>
+    <PropertyFilter rows={resource.data} value={only} onChange={setOnly} />
     <AgentMessage>{copy.hint}</AgentMessage>
     <AgentLoadState resource={resource} empty={copy.empty}>
-      {resource.data?.map((row) => <RequestCard key={kind + (row.offer_id || row.application_id || row.viewing_id)}
+      {shown?.length === 0 && resource.data?.length ? <AgentMessage>{copy.empty.replace('.', ' on this property.')}</AgentMessage> : null}
+      {shown?.map((row) => <RequestCard key={kind + (row.offer_id || row.application_id || row.viewing_id)}
         row={row} kind={kind} copy={copy} service={service} onChanged={onChanged} />)}
     </AgentLoadState>
   </ScrollView>;
