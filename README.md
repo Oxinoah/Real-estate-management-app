@@ -31,7 +31,7 @@ e-mail first, then log in. The session is kept on the phone, so the app reopens 
 |---|---|---|
 | Buyer | Browse · Favourites · My Activity · Profile | Search and filter (keyword / location, sale or rent, property type, price range), favourites, enquiries, viewing requests, offers (sale) and rental applications with move-in date and notes (active listings only), follow everything with its status in My Activity, pull to refresh |
 | Seller | Properties · Requests · Enquiries · Profile | My properties with status filter, create a listing (draft or published, sample photos), edit, delete (draft / active only), publish / withdraw, complete the sale or rental, "deal fell through", status history, accept / reject offers and rental applications, confirm / decline viewings, answer enquiries |
-| Agent | Properties · Enquiries · Requests · Stats | My / all properties, take a listing on or release it, edit and change status, status history, answer enquiries, accept / reject offers, applications and viewings, statistics (active listings per seller, average sale price and rent, offers per property) — see `docs/agent/README.md` |
+| Agent | Properties · Enquiries · Requests · Stats | My / all properties with summary, search, status filter and requests to answer per listing, select several listings to take on or release them at once, previous / next between listings, requests and enquiries filtered by listing, take a listing on or release it, edit and change status, status history, answer enquiries, accept / reject offers, applications and viewings, statistics (active listings per seller, average sale price and rent, offers per property) — see `docs/agent/README.md` |
 
 ## Listing lifecycle
 

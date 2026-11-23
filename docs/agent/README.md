@@ -9,9 +9,23 @@ as the Buyer and Seller screens. Entry point: `src/screens/AgentHomeScreen.js`
 | Tab | Features |
 |---|---|
 | **Properties** | List the properties they manage ("My properties" or "All properties"), open one, edit it, publish / withdraw it, complete the sale / rental (or "deal fell through"), take it on ("Assign to me") or release it, see its status history |
-| **Enquiries** | Read buyer enquiries and send a reply (the buyer sees it in My Activity) |
-| **Requests** | Accept or reject purchase offers, rental applications and viewing requests |
+| **Enquiries** | Read buyer enquiries and send a reply (the buyer sees it in My Activity); filter by listing |
+| **Requests** | Accept or reject purchase offers, rental applications and viewing requests; filter by listing |
 | **Stats** | Active listings per seller, average sale price / monthly rent, number of offers per property |
+
+## Managing several properties (Week 4)
+
+- **Properties tab**: a summary of the portfolio (number of listings by status
+  and number of requests waiting), a search on title / location / seller, a
+  status filter, and a sort "Newest" / "Needs an answer". Each card shows
+  whether the listing is *Yours*, *Unassigned* or another agent's, and what is
+  waiting on it (offers, applications, viewings, questions).
+- **Select**: tick several listings, then "Assign to me" or "Release" them in
+  one go (`assignMany`: only unassigned listings are taken, only the agent's
+  own are released).
+- **Property screen**: "‹ Previous / Next ›" moves through the list the agent
+  came from (same filter and order) without going back to it. The *Waiting for
+  an answer* card opens the Requests or Enquiries tab filtered on that listing.
 
 ## Rules
 
@@ -36,7 +50,8 @@ src/screens/agent/                      list, detail, enquiries, requests, stats
 src/components/agent/AgentUI.js         buttons, fields, cards
 src/hooks/agent/useAgentResource.js     loading / action state
 src/services/agent/agentService.js      Supabase queries (client injected)
-src/utils/agent/rules.js                transitions, validation, statistics
+src/utils/agent/rules.js                transitions, validation, statistics,
+                                        pending work, portfolio filter, previous/next
 supabase/schema_03_accept_rental.sql    rental acceptance function
 tests/agent/agent.test.mjs              rules, statistics and service tests
 ```
