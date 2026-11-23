@@ -5,7 +5,7 @@ import TabBar from '../components/TabBar';
 import { colors } from '../theme';
 import { supabase } from '../lib/supabase';
 import { createAgentService } from '../services/agent/agentService';
-import { AGENT_TABS } from '../utils/agent/rules';
+import { AGENT_TABS, neighbours } from '../utils/agent/rules';
 import { AgentMessage } from '../components/agent/AgentUI';
 import AgentPropertyListScreen from './agent/AgentPropertyListScreen';
 import AgentPropertyDetailScreen from './agent/AgentPropertyDetailScreen';
@@ -21,11 +21,14 @@ const SCOPES = [
 // Agent home: bottom tabs (Properties / Enquiries / Requests / Stats), the
 // property screen, and a "My properties / All properties" switch that applies
 // to every tab. Same layout as the Buyer and Seller homes.
+// Several properties at once: the property screen remembers the list the
+// agent came from (previous / next).
 export default function AgentHomeScreen({ session, onLogout }) {
   const service = useMemo(() => createAgentService(supabase, session.user.id), [session.user.id]);
   const [tab, setTab] = useState('properties');
   const [scope, setScope] = useState('mine');
   const [propertyId, setPropertyId] = useState(null);
+  const [browsing, setBrowsing] = useState([]); // ids of the list the property was opened from
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState(null);
   const mounted = useRef(true);
@@ -46,12 +49,32 @@ export default function AgentHomeScreen({ session, onLogout }) {
     }
   }
 
+  function changeTab(next) {
+    setPropertyId(null);
+    setNotice(null);
+    setTab(next);
+  }
+
   const common = { service, scope, revision, onChanged: changed };
   let content;
   if (propertyId != null) {
-    content = <AgentPropertyDetailScreen {...common} propertyId={propertyId} onBack={() => setPropertyId(null)} />;
+    content = (
+      <AgentPropertyDetailScreen
+        key={propertyId}
+        {...common}
+        propertyId={propertyId}
+        position={neighbours(browsing, propertyId)}
+        onNavigate={(id) => { setNotice(null); setPropertyId(id); }}
+        onBack={() => setPropertyId(null)}
+      />
+    );
   } else if (tab === 'properties') {
-    content = <AgentPropertyListScreen {...common} onOpen={setPropertyId} />;
+    content = (
+      <AgentPropertyListScreen
+        {...common}
+        onOpen={(id, ids) => { setNotice(null); setBrowsing(ids); setPropertyId(id); }}
+      />
+    );
   } else if (tab === 'enquiries') {
     content = <AgentEnquiriesScreen {...common} />;
   } else if (tab === 'requests') {
@@ -91,11 +114,7 @@ export default function AgentHomeScreen({ session, onLogout }) {
       <TabBar
         tabs={AGENT_TABS}
         active={tab}
-        onChange={(next) => {
-          setPropertyId(null);
-          setNotice(null);
-          setTab(next);
-        }}
+        onChange={(next) => changeTab(next)}
       />
     </Screen>
   );

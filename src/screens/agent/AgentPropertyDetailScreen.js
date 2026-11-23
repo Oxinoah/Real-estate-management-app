@@ -10,7 +10,11 @@ import { canEditProperty, dateTime, propertyTransitions, validateProperty } from
 
 // Agent property screen: photos, details, moderation (edit, change status),
 // taking the listing on or releasing it, and the status history.
-export default function AgentPropertyDetailScreen({ service, propertyId, revision, onChanged, onBack }) {
+// With several properties: "Previous / Next" moves through the list the agent
+// came from (position = neighbours(ids, id)).
+export default function AgentPropertyDetailScreen({
+  service, propertyId, revision, onChanged, onBack, position, onNavigate,
+}) {
   const resource = useAgentResource(() => service.loadProperty(propertyId), [service, propertyId, revision]);
   const action = useAgentAction(onChanged);
   const [editing, setEditing] = useState(false);
@@ -29,6 +33,19 @@ export default function AgentPropertyDetailScreen({ service, propertyId, revisio
           <Text style={localStyles.backText}>←</Text>
         </Pressable>
       </View>
+      {position && position.total > 1 && position.index !== -1 ? (
+        <View style={localStyles.pager}>
+          <Pressable disabled={position.previous == null} onPress={() => onNavigate(position.previous)}
+            accessibilityLabel="Previous property" style={position.previous == null && localStyles.pagerOff}>
+            <Text style={localStyles.pagerText}>‹ Previous</Text>
+          </Pressable>
+          <Text style={localStyles.pagerCount}>{position.index + 1} / {position.total}</Text>
+          <Pressable disabled={position.next == null} onPress={() => onNavigate(position.next)}
+            accessibilityLabel="Next property" style={position.next == null && localStyles.pagerOff}>
+            <Text style={localStyles.pagerText}>Next ›</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {images.length > 1 ? (
         <View style={localStyles.thumbs}>
           {images.slice(0, 5).map((uri, i) => (
@@ -140,6 +157,13 @@ const localStyles = StyleSheet.create({
   },
   backText: { fontSize: 14, color: colors.text },
   thumbs: { flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingVertical: 10 },
+  pager: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  pagerText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  pagerCount: { fontSize: 12, color: colors.muted },
+  pagerOff: { opacity: 0.3 },
   thumbOn: { borderWidth: 2, borderColor: colors.text },
   price: { fontSize: 20, fontWeight: '700', color: colors.text, marginTop: 4 },
 });
