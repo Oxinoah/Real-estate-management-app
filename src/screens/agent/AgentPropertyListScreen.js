@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { ScrollView, Text, View, Pressable, TextInput, StyleSheet } from 'react-native';
 import Photo from '../../components/Photo';
 import StatusBadge from '../../components/StatusBadge';
-import { AgentLoadState, AgentMessage, styles as ui } from '../../components/agent/AgentUI';
-import { useAgentResource } from '../../hooks/agent/useAgentResource';
+import { AgentButton, AgentLoadState, AgentMessage, styles as ui } from '../../components/agent/AgentUI';
+import { useAgentAction, useAgentResource } from '../../hooks/agent/useAgentResource';
 import { colors } from '../../theme';
 import { formatPrice, statusLabel } from '../../utils/format';
 import { filterPortfolio, pendingWork, portfolioSummary } from '../../utils/agent/rules';
@@ -16,19 +16,49 @@ const SORTS = [
 
 // Agent "Properties" tab: every listing the agent manages ("My properties")
 // or can take on ("All properties"), with a summary, a status filter, a
-// search and the number of requests waiting on each listing.
+// search, the number of requests waiting on each listing, and a selection
+// mode to take on or release several listings at once.
 // onOpen(id, ids) also passes the ids of the listed properties so the
 // property screen can move to the previous / next one.
-export default function AgentPropertyListScreen({ service, scope, revision, onOpen }) {
+export default function AgentPropertyListScreen({ service, scope, revision, onOpen, onChanged }) {
   const resource = useAgentResource(() => service.loadPortfolio(scope), [service, scope, revision]);
+  // No automatic refresh: assign() reports how many listings changed itself.
+  const action = useAgentAction();
   const [status, setStatus] = useState('all');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('recent');
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState([]);
 
   const all = resource.data || [];
   const shown = filterPortfolio(all, { status, search, sort });
   const ids = shown.map((p) => p.property_id);
   const summary = portfolioSummary(all);
+  const chosen = all.filter((p) => selected.includes(p.property_id));
+  const canTake = chosen.filter((p) => !p.agent_id).map((p) => p.property_id);
+  const canRelease = chosen.filter((p) => p.agent_id === service.agentId).map((p) => p.property_id);
+
+  function toggle(id) {
+    setSelected((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
+  }
+
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected([]);
+  }
+
+  async function assign(propertyIds, assigned) {
+    let changed = 0;
+    const done = await action.run(async () => {
+      changed = await service.assignMany(propertyIds, assigned);
+    }, null);
+    if (done) {
+      onChanged(assigned
+        ? `${changed} propert${changed === 1 ? 'y' : 'ies'} assigned to you.`
+        : `${changed} propert${changed === 1 ? 'y' : 'ies'} released.`);
+      stopSelecting();
+    }
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
@@ -83,17 +113,38 @@ export default function AgentPropertyListScreen({ service, scope, revision, onOp
               </Pressable>
             ))}
           </View>
+          <Pressable onPress={() => (selecting ? stopSelecting() : setSelecting(true))}>
+            <Text style={styles.sortActive}>{selecting ? 'Cancel' : 'Select'}</Text>
+          </Pressable>
         </View>
+
+        {selecting ? (
+          <View style={styles.selectBar}>
+            <Text style={ui.muted}>
+              {selected.length ? `${selected.length} selected` : 'Tap the properties to select them.'}
+            </Text>
+            <View style={ui.row}>
+              <AgentButton title={`Assign to me (${canTake.length})`} primary
+                disabled={!canTake.length || action.busy} onPress={() => assign(canTake, true)} />
+              <AgentButton title={`Release (${canRelease.length})`}
+                disabled={!canRelease.length || action.busy} onPress={() => assign(canRelease, false)} />
+            </View>
+            <Text style={ui.muted}>Only unassigned properties can be taken on; only yours can be released.</Text>
+          </View>
+        ) : null}
+        <AgentMessage error>{action.error}</AgentMessage>
 
         {!shown.length ? <AgentMessage>No property matches this search or filter.</AgentMessage> : null}
         {shown.map((p) => {
           const work = pendingWork(p);
+          const isSelected = selected.includes(p.property_id);
           const owner = p.agent_id === service.agentId ? 'Yours' : p.agent_id ? 'Other agent' : 'Unassigned';
           return (
             <Pressable
               key={p.property_id}
-              style={styles.card}
-              onPress={() => onOpen(p.property_id, ids)}
+              style={[styles.card, isSelected && styles.cardSelected]}
+              onPress={() => (selecting ? toggle(p.property_id) : onOpen(p.property_id, ids))}
+              accessibilityState={selecting ? { selected: isSelected } : undefined}
             >
               <Photo uri={p.property_images?.[0]?.url} width={104} height={118} />
               <View style={styles.body}>
@@ -115,6 +166,7 @@ export default function AgentPropertyListScreen({ service, scope, revision, onOp
                   </Text>
                 ) : null}
               </View>
+              {selecting ? <Text style={styles.check}>{isSelected ? '☑' : '☐'}</Text> : null}
             </Pressable>
           );
         })}
@@ -140,7 +192,9 @@ const styles = StyleSheet.create({
   toolbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sort: { fontSize: 12, color: colors.muted, paddingVertical: 4 },
   sortActive: { fontSize: 12, color: colors.text, fontWeight: '700', paddingVertical: 4 },
+  selectBar: { borderWidth: 1, borderColor: colors.text, borderRadius: 8, padding: 12, gap: 8 },
   card: { flexDirection: 'row', borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden' },
+  cardSelected: { borderColor: colors.text, borderWidth: 2 },
   body: { flex: 1, paddingVertical: 8, paddingHorizontal: 12, gap: 3 },
   cardTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
   meta: { fontSize: 11, color: colors.muted },
@@ -148,4 +202,5 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   owner: { fontSize: 11, color: colors.muted },
   work: { fontSize: 11, fontWeight: '700', color: colors.text },
+  check: { fontSize: 20, paddingHorizontal: 10, alignSelf: 'center', color: colors.text },
 });
