@@ -22,13 +22,16 @@ const SCOPES = [
 // property screen, and a "My properties / All properties" switch that applies
 // to every tab. Same layout as the Buyer and Seller homes.
 // Several properties at once: the property screen remembers the list the
-// agent came from (previous / next).
+// agent came from (previous / next), and "focus" opens the Requests or
+// Enquiries tab filtered on one property.
 export default function AgentHomeScreen({ session, onLogout }) {
   const service = useMemo(() => createAgentService(supabase, session.user.id), [session.user.id]);
   const [tab, setTab] = useState('properties');
   const [scope, setScope] = useState('mine');
   const [propertyId, setPropertyId] = useState(null);
   const [browsing, setBrowsing] = useState([]); // ids of the list the property was opened from
+  const [focus, setFocus] = useState(null); // property id the Requests / Enquiries tabs are filtered on
+  const [focusKind, setFocusKind] = useState(null); // 'offers' | 'applications' | 'viewings' for Requests
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState(null);
   const mounted = useRef(true);
@@ -49,9 +52,11 @@ export default function AgentHomeScreen({ session, onLogout }) {
     }
   }
 
-  function changeTab(next) {
+  function changeTab(next, focusOn = null, kind = null) {
     setPropertyId(null);
     setNotice(null);
+    setFocus(focusOn);
+    setFocusKind(kind);
     setTab(next);
   }
 
@@ -65,6 +70,7 @@ export default function AgentHomeScreen({ session, onLogout }) {
         propertyId={propertyId}
         position={neighbours(browsing, propertyId)}
         onNavigate={(id) => { setNotice(null); setPropertyId(id); }}
+        onOpenRequests={(id, kind) => changeTab(kind === 'enquiries' ? 'enquiries' : 'requests', id, kind)}
         onBack={() => setPropertyId(null)}
       />
     );
@@ -76,9 +82,9 @@ export default function AgentHomeScreen({ session, onLogout }) {
       />
     );
   } else if (tab === 'enquiries') {
-    content = <AgentEnquiriesScreen {...common} />;
+    content = <AgentEnquiriesScreen {...common} focus={focus} />;
   } else if (tab === 'requests') {
-    content = <AgentRequestsScreen {...common} />;
+    content = <AgentRequestsScreen {...common} focus={focus} initialKind={focusKind} />;
   } else {
     content = <AgentStatsScreen {...common} />;
   }

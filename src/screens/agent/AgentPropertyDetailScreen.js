@@ -6,14 +6,15 @@ import { AgentButton, AgentCard, AgentField, AgentLoadState, AgentMessage, style
 import { useAgentAction, useAgentResource } from '../../hooks/agent/useAgentResource';
 import { colors } from '../../theme';
 import { formatPrice, transactionLabel } from '../../utils/format';
-import { canEditProperty, dateTime, propertyTransitions, validateProperty } from '../../utils/agent/rules';
+import { canEditProperty, dateTime, pendingWork, propertyTransitions, validateProperty } from '../../utils/agent/rules';
 
 // Agent property screen: photos, details, moderation (edit, change status),
 // taking the listing on or releasing it, and the status history.
 // With several properties: "Previous / Next" moves through the list the agent
-// came from (position = neighbours(ids, id)).
+// came from (position = neighbours(ids, id)), and the "Waiting for an answer"
+// card opens the Requests / Enquiries tab filtered on this property.
 export default function AgentPropertyDetailScreen({
-  service, propertyId, revision, onChanged, onBack, position, onNavigate,
+  service, propertyId, revision, onChanged, onBack, position, onNavigate, onOpenRequests,
 }) {
   const resource = useAgentResource(() => service.loadProperty(propertyId), [service, propertyId, revision]);
   const action = useAgentAction(onChanged);
@@ -71,6 +72,8 @@ export default function AgentPropertyDetailScreen({
               <Text style={styles.muted}>{mine ? 'Assigned to you' : property.agent_id ? 'Assigned to another agent' : 'Not assigned to an agent'}</Text>
             </View>
 
+            {onOpenRequests ? <WaitingCard property={property} onOpen={onOpenRequests} /> : null}
+
             {editing ? (
               <PropertyEditor key={property.property_id} property={property} service={service}
                 onCancel={() => setEditing(false)} onSaved={(message) => { setEditing(false); onChanged(message); }} />
@@ -116,6 +119,28 @@ export default function AgentPropertyDetailScreen({
       </View>
     </ScrollView>
   );
+}
+
+// What buyers sent on this property that still needs an answer.
+function WaitingCard({ property, onOpen }) {
+  const work = pendingWork(property);
+  const rent = property.transaction_type === 'rent';
+  const items = [
+    rent
+      ? { kind: 'applications', count: work.applications, label: 'rental application' }
+      : { kind: 'offers', count: work.offers, label: 'offer' },
+    { kind: 'viewings', count: work.viewings, label: 'viewing request' },
+    { kind: 'enquiries', count: work.enquiries, label: 'question' },
+  ];
+  return <AgentCard>
+    <Text style={styles.heading}>Waiting for an answer</Text>
+    {work.total === 0 ? <AgentMessage>Nothing to answer on this property.</AgentMessage> : null}
+    <View style={styles.row}>
+      {items.map((item) => <AgentButton key={item.kind} primary={item.count > 0}
+        title={`${item.count} ${item.label}${item.count === 1 ? '' : 's'}`}
+        onPress={() => onOpen(property.property_id, item.kind)} />)}
+    </View>
+  </AgentCard>;
 }
 
 function PropertyEditor({ property, service, onSaved, onCancel }) {
