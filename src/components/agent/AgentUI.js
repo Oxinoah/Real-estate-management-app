@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, TextInput, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Pressable, TextInput, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { colors } from '../../theme';
 
 export function AgentButton({ title, onPress, disabled, primary = false }) {
@@ -33,6 +33,34 @@ export function AgentField({ label, ...props }) {
       style={[styles.input, props.multiline && styles.multiline]} /></View>;
 }
 
+// "All properties / one property" chips for the Requests and Enquiries tabs,
+// built from the loaded rows (each row has row.properties.{property_id,title}).
+export function propertiesOf(rows) {
+  const seen = new Map();
+  for (const row of rows || []) {
+    if (row.properties && !seen.has(row.property_id)) seen.set(row.property_id, row.properties.title);
+  }
+  return [...seen].map(([id, title]) => ({ id, title }));
+}
+
+export function PropertyFilter({ rows, value, onChange }) {
+  const properties = propertiesOf(rows);
+  if (properties.length < 2 && value == null) return null;
+  const options = [{ id: null, title: 'All listings' }, ...properties];
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={styles.row}>
+        {options.map((o) => (
+          <Pressable key={String(o.id)} onPress={() => onChange(o.id)}
+            style={[styles.filterChip, value === o.id && styles.filterChipOn]}>
+            <Text numberOfLines={1} style={[styles.filterText, value === o.id && styles.filterTextOn]}>{o.title}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
 export const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 12, gap: 8 },
   body: { paddingHorizontal: 20, paddingVertical: 12, gap: 14, paddingBottom: 28 },
@@ -53,4 +81,8 @@ export const styles = StyleSheet.create({
   multiline: { minHeight: 85, textAlignVertical: 'top' },
   message: { fontSize: 13, lineHeight: 20, color: colors.muted },
   error: { color: colors.error },
+  filterChip: { borderWidth: 1, borderColor: colors.border, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12, maxWidth: 200 },
+  filterChipOn: { backgroundColor: colors.text, borderColor: colors.text },
+  filterText: { fontSize: 12, color: colors.text },
+  filterTextOn: { color: '#fff', fontWeight: '600' },
 });

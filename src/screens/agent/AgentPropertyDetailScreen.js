@@ -6,11 +6,16 @@ import { AgentButton, AgentCard, AgentField, AgentLoadState, AgentMessage, style
 import { useAgentAction, useAgentResource } from '../../hooks/agent/useAgentResource';
 import { colors } from '../../theme';
 import { formatPrice, transactionLabel } from '../../utils/format';
-import { canEditProperty, dateTime, propertyTransitions, validateProperty } from '../../utils/agent/rules';
+import { canEditProperty, dateTime, pendingWork, propertyTransitions, validateProperty } from '../../utils/agent/rules';
 
 // Agent property screen: photos, details, moderation (edit, change status),
 // taking the listing on or releasing it, and the status history.
-export default function AgentPropertyDetailScreen({ service, propertyId, revision, onChanged, onBack }) {
+// With several properties: "Previous / Next" moves through the list the agent
+// came from (position = neighbours(ids, id)), and the "Waiting for an answer"
+// card opens the Requests / Enquiries tab filtered on this property.
+export default function AgentPropertyDetailScreen({
+  service, propertyId, revision, onChanged, onBack, position, onNavigate, onOpenRequests,
+}) {
   const resource = useAgentResource(() => service.loadProperty(propertyId), [service, propertyId, revision]);
   const action = useAgentAction(onChanged);
   const [editing, setEditing] = useState(false);
@@ -29,6 +34,19 @@ export default function AgentPropertyDetailScreen({ service, propertyId, revisio
           <Text style={localStyles.backText}>←</Text>
         </Pressable>
       </View>
+      {position && position.total > 1 && position.index !== -1 ? (
+        <View style={localStyles.pager}>
+          <Pressable disabled={position.previous == null} onPress={() => onNavigate(position.previous)}
+            accessibilityLabel="Previous property" style={position.previous == null && localStyles.pagerOff}>
+            <Text style={localStyles.pagerText}>‹ Previous</Text>
+          </Pressable>
+          <Text style={localStyles.pagerCount}>{position.index + 1} / {position.total}</Text>
+          <Pressable disabled={position.next == null} onPress={() => onNavigate(position.next)}
+            accessibilityLabel="Next property" style={position.next == null && localStyles.pagerOff}>
+            <Text style={localStyles.pagerText}>Next ›</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {images.length > 1 ? (
         <View style={localStyles.thumbs}>
           {images.slice(0, 5).map((uri, i) => (
@@ -53,6 +71,8 @@ export default function AgentPropertyDetailScreen({ service, propertyId, revisio
               <Text style={styles.muted}>Seller: {property.seller?.full_name || '—'}</Text>
               <Text style={styles.muted}>{mine ? 'Assigned to you' : property.agent_id ? 'Assigned to another agent' : 'Not assigned to an agent'}</Text>
             </View>
+
+            {onOpenRequests ? <WaitingCard property={property} onOpen={onOpenRequests} /> : null}
 
             {editing ? (
               <PropertyEditor key={property.property_id} property={property} service={service}
@@ -101,6 +121,28 @@ export default function AgentPropertyDetailScreen({ service, propertyId, revisio
   );
 }
 
+// What buyers sent on this property that still needs an answer.
+function WaitingCard({ property, onOpen }) {
+  const work = pendingWork(property);
+  const rent = property.transaction_type === 'rent';
+  const items = [
+    rent
+      ? { kind: 'applications', count: work.applications, label: 'rental application' }
+      : { kind: 'offers', count: work.offers, label: 'offer' },
+    { kind: 'viewings', count: work.viewings, label: 'viewing request' },
+    { kind: 'enquiries', count: work.enquiries, label: 'question' },
+  ];
+  return <AgentCard>
+    <Text style={styles.heading}>Waiting for an answer</Text>
+    {work.total === 0 ? <AgentMessage>Nothing to answer on this property.</AgentMessage> : null}
+    <View style={styles.row}>
+      {items.map((item) => <AgentButton key={item.kind} primary={item.count > 0}
+        title={`${item.count} ${item.label}${item.count === 1 ? '' : 's'}`}
+        onPress={() => onOpen(property.property_id, item.kind)} />)}
+    </View>
+  </AgentCard>;
+}
+
 function PropertyEditor({ property, service, onSaved, onCancel }) {
   const [values, setValues] = useState(() => ({
     title: property.title, description: property.description || '', price: String(property.price),
@@ -140,6 +182,13 @@ const localStyles = StyleSheet.create({
   },
   backText: { fontSize: 14, color: colors.text },
   thumbs: { flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingVertical: 10 },
+  pager: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  pagerText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  pagerCount: { fontSize: 12, color: colors.muted },
+  pagerOff: { opacity: 0.3 },
   thumbOn: { borderWidth: 2, borderColor: colors.text },
   price: { fontSize: 20, fontWeight: '700', color: colors.text, marginTop: 4 },
 });

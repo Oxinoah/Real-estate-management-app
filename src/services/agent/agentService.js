@@ -9,6 +9,8 @@ import { computeStats, validateProperty } from '../../utils/agent/rules.js';
 
 const BUYER = 'buyer:profiles!buyer_id(full_name)';
 const PROPERTY = 'properties!inner(property_id,agent_id,title,location,transaction_type,status)';
+// Loaded with each listing so the Properties tab can show what is waiting for an answer.
+const WORK = 'offers(status),rental_applications(status),viewings(status),enquiries(response)';
 
 function explain(error, context) {
   if (error?.code === '42501') return new Error(`${context} Access denied for this account.`);
@@ -53,7 +55,7 @@ export function createAgentService(client, agentId) {
     },
 
     loadPortfolio(scope) {
-      let query = client.from('properties').select('*,property_images(url),seller:profiles!seller_id(full_name)')
+      let query = client.from('properties').select(`*,property_images(url),seller:profiles!seller_id(full_name),${WORK}`)
         .order('created_at', { ascending: false });
       if (scope === 'mine') query = query.eq('agent_id', agentId);
       return run(query, 'Could not load properties.');
@@ -61,7 +63,7 @@ export function createAgentService(client, agentId) {
 
     async loadProperty(propertyId) {
       const property = await run(client.from('properties')
-        .select('*,property_images(image_id,url),seller:profiles!seller_id(full_name)')
+        .select(`*,property_images(image_id,url),seller:profiles!seller_id(full_name),${WORK}`)
         .eq('property_id', propertyId).single(), 'Could not load this property.');
       const history = await run(client.from('status_history')
         .select('history_id,old_status,new_status,changed_at,changer:profiles!changed_by(full_name)')
@@ -85,6 +87,18 @@ export function createAgentService(client, agentId) {
     // An agent can take a listing on (or release it) so it shows in "My properties".
     assign: (property, assigned) =>
       updateProperty(property, { agent_id: assigned ? agentId : null }, 'Could not change the assignment.'),
+
+    // Takes on (or releases) several listings in one go. Only unassigned
+    // listings are taken, and only the agent's own ones are released, so a
+    // colleague's property is never taken over. Returns how many changed.
+    async assignMany(propertyIds, assigned) {
+      const ids = [...new Set(propertyIds)];
+      if (!ids.length) throw new Error('Select at least one property.');
+      let query = client.from('properties').update({ agent_id: assigned ? agentId : null }).in('property_id', ids);
+      query = assigned ? query.is('agent_id', null) : query.eq('agent_id', agentId);
+      const data = await run(query.select('property_id'), 'Could not change the assignment.');
+      return data?.length || 0;
+    },
 
     updateProperty(property, values) {
       const checked = validateProperty(values);

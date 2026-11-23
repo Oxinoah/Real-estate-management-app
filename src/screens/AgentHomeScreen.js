@@ -5,7 +5,7 @@ import TabBar from '../components/TabBar';
 import { colors } from '../theme';
 import { supabase } from '../lib/supabase';
 import { createAgentService } from '../services/agent/agentService';
-import { AGENT_TABS } from '../utils/agent/rules';
+import { AGENT_TABS, neighbours } from '../utils/agent/rules';
 import { AgentMessage } from '../components/agent/AgentUI';
 import AgentPropertyListScreen from './agent/AgentPropertyListScreen';
 import AgentPropertyDetailScreen from './agent/AgentPropertyDetailScreen';
@@ -21,11 +21,17 @@ const SCOPES = [
 // Agent home: bottom tabs (Properties / Enquiries / Requests / Stats), the
 // property screen, and a "My properties / All properties" switch that applies
 // to every tab. Same layout as the Buyer and Seller homes.
+// Several properties at once: the property screen remembers the list the
+// agent came from (previous / next), and "focus" opens the Requests or
+// Enquiries tab filtered on one property.
 export default function AgentHomeScreen({ session, onLogout }) {
   const service = useMemo(() => createAgentService(supabase, session.user.id), [session.user.id]);
   const [tab, setTab] = useState('properties');
   const [scope, setScope] = useState('mine');
   const [propertyId, setPropertyId] = useState(null);
+  const [browsing, setBrowsing] = useState([]); // ids of the list the property was opened from
+  const [focus, setFocus] = useState(null); // property id the Requests / Enquiries tabs are filtered on
+  const [focusKind, setFocusKind] = useState(null); // 'offers' | 'applications' | 'viewings' for Requests
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState(null);
   const mounted = useRef(true);
@@ -46,16 +52,39 @@ export default function AgentHomeScreen({ session, onLogout }) {
     }
   }
 
+  function changeTab(next, focusOn = null, kind = null) {
+    setPropertyId(null);
+    setNotice(null);
+    setFocus(focusOn);
+    setFocusKind(kind);
+    setTab(next);
+  }
+
   const common = { service, scope, revision, onChanged: changed };
   let content;
   if (propertyId != null) {
-    content = <AgentPropertyDetailScreen {...common} propertyId={propertyId} onBack={() => setPropertyId(null)} />;
+    content = (
+      <AgentPropertyDetailScreen
+        key={propertyId}
+        {...common}
+        propertyId={propertyId}
+        position={neighbours(browsing, propertyId)}
+        onNavigate={(id) => { setNotice(null); setPropertyId(id); }}
+        onOpenRequests={(id, kind) => changeTab(kind === 'enquiries' ? 'enquiries' : 'requests', id, kind)}
+        onBack={() => setPropertyId(null)}
+      />
+    );
   } else if (tab === 'properties') {
-    content = <AgentPropertyListScreen {...common} onOpen={setPropertyId} />;
+    content = (
+      <AgentPropertyListScreen
+        {...common}
+        onOpen={(id, ids) => { setNotice(null); setBrowsing(ids); setPropertyId(id); }}
+      />
+    );
   } else if (tab === 'enquiries') {
-    content = <AgentEnquiriesScreen {...common} />;
+    content = <AgentEnquiriesScreen {...common} focus={focus} />;
   } else if (tab === 'requests') {
-    content = <AgentRequestsScreen {...common} />;
+    content = <AgentRequestsScreen {...common} focus={focus} initialKind={focusKind} />;
   } else {
     content = <AgentStatsScreen {...common} />;
   }
@@ -91,11 +120,7 @@ export default function AgentHomeScreen({ session, onLogout }) {
       <TabBar
         tabs={AGENT_TABS}
         active={tab}
-        onChange={(next) => {
-          setPropertyId(null);
-          setNotice(null);
-          setTab(next);
-        }}
+        onChange={(next) => changeTab(next)}
       />
     </Screen>
   );
