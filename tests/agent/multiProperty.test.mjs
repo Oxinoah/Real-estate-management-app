@@ -42,3 +42,41 @@ test('previous / next follow the list the agent came from', () => {
   assert.deepEqual(neighbours([4, 8, 2], 4), { index: 0, total: 3, previous: null, next: 8 });
   assert.equal(neighbours([4, 8, 2], 99).index, -1);
 });
+
+import { createAgentService } from '../../src/services/agent/agentService.js';
+
+function fakeClient(result) {
+  const calls = [];
+  const builder = new Proxy({}, {
+    get(_, name) {
+      if (name === 'then') return (resolve) => resolve(result);
+      return (...args) => { calls.push([name, ...args]); return builder; };
+    },
+  });
+  return { calls, from: (table) => { calls.push(['from', table]); return builder; } };
+}
+
+test('the portfolio is loaded with the requests waiting on each property', async () => {
+  const client = fakeClient({ data: [], error: null });
+  await createAgentService(client, 'a').loadPortfolio('mine');
+  const select = client.calls.find((c) => c[0] === 'select')[1];
+  for (const part of ['offers(status)', 'rental_applications(status)', 'viewings(status)', 'enquiries(response)']) {
+    assert.ok(select.includes(part), part);
+  }
+});
+
+test("assigning several takes only unassigned listings; releasing only the agent's own", async () => {
+  const take = fakeClient({ data: [{ property_id: 1 }, { property_id: 2 }], error: null });
+  assert.equal(await createAgentService(take, 'a').assignMany([1, 2, 2], true), 2);
+  assert.ok(take.calls.some((c) => c[0] === 'update' && c[1].agent_id === 'a'));
+  assert.ok(take.calls.some((c) => c[0] === 'in' && c[1] === 'property_id' && c[2].length === 2));
+  assert.ok(take.calls.some((c) => c[0] === 'is' && c[1] === 'agent_id' && c[2] === null));
+
+  const release = fakeClient({ data: [{ property_id: 1 }], error: null });
+  assert.equal(await createAgentService(release, 'a').assignMany([1], false), 1);
+  assert.ok(release.calls.some((c) => c[0] === 'update' && c[1].agent_id === null));
+  assert.ok(release.calls.some((c) => c[0] === 'eq' && c[1] === 'agent_id' && c[2] === 'a'));
+
+  const none = fakeClient({ data: [], error: null });
+  await assert.rejects(createAgentService(none, 'a').assignMany([], true), /at least one/);
+});
